@@ -11,6 +11,7 @@ import json
 from uuid import uuid4
 
 Cursor = namedtuple('Cursor', ('row', 'column'))
+
 users = []
 
 class User(object):
@@ -18,11 +19,11 @@ class User(object):
 
     next_user = 0
 
-    def __init__(self, cursor=None):
+    def __init__(self, cursor=None,name=None):
 
         self.id = User.next_user
         User.next_user += 1
-
+        self.username=name or "user" + str(User.next_user)
         self.cursor = cursor or Cursor(0, 0)
         print '--'
 
@@ -62,6 +63,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
         constructor=json.dumps({
                 'act': 'create_cursor',
+                'name': self.users[len(users)-1].username,
                 'user_id': self.users[len(users)-1].id,
                 'row': self.users[len(users)-1].cursor.row,
                 'column': self.users[len(users)-1].cursor.column
@@ -79,7 +81,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
 
     def on_message(self, message):
-        # print(message)
+         # print(message)
         if ("action" in message):
             self.broadcast((x for x in self.participants if x != self), message)
             self.board.append(message)

@@ -11,22 +11,82 @@
 <h3>Collaborative Editor!</h3>
 
 <style type="text/css" media="screen">
-  .ace_marker-layer.ace-bracket{
-      position:absolute;
-      z-index:5;
+
+  div.user_1.ace_cursor {
+        border-left-color: red;
   }
+   div.user_2.ace_cursor {
+        border-left-color: orange;
+  }
+   div.user_3.ace_cursor {
+        border-left-color: yellow;
+  }
+    div.user_4.ace_cursor {
+        border-left-color: green;
+  }
+    div.user_5.ace_cursor {
+        border-left-color: deepskyblue;
+  }
+    div.user_6.ace_cursor {
+        border-left-color: blue;
+  }
+    div.user_7.ace_cursor {
+        border-left-color: purple;
+  }
+     div.user_8.ace_cursor {
+        border-left-color: slategray;
+  }
+     div.user_9.ace_cursor {
+        border-left-color: brown;
+  }
+     div.user_0.ace_cursor {
+        border-left-color: sandybrown;
+  }
+     div.user_1.ace_selection.ace_start {
+        background: red;
+  }
+   div.user_2.ace_selection.ace_start {
+        background: orange;
+  }
+   div.user_3.ace_selection.ace_start {
+        background: yellow;
+  }
+    div.user_4.ace_selection.ace_start {
+        background: green;
+  }
+    div.user_5.ace_selection.ace_start {
+        background: deepskyblue;
+  }
+    div.user_6.ace_selection.ace_start {
+        background: blue;
+  }
+    div.user_7.ace_selection.ace_start {
+        background: purple;
+  }
+     div.user_8.ace_selection.ace_start {
+        background: slategray;
+  }
+     div.user_9.ace_selection.ace_start {
+        background: brown;
+  }
+     div.user_0.ace_selection.ace_start {
+        background: sandybrown;
+  }
+
   #editor {
-            height: 300px;
-            /*min-width: 275px;*/
-            display: block;
-            position:relative;
-	      }
+      height: 300px;
+      /*min-width: 275px;*/
+      display: block;
+      position:relative;
+
+      }
 </style>
 
 
 
 <div id="editor">
 </div>
+<div>Current User List:</div>
 
 <script src="/static/src-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
 
@@ -45,13 +105,49 @@
       var r=ace.require('ace/range').Range;
       var users=[];
 
+      function DynamicDiv(num,name,user_id) {
+          var color="white";
+           if(num==0){
+              color= "sandybrown";
+          }else if(num==1){
+              color="red";
+          }else if(num==2){
+              color="orange";
+          }else if(num==3){
+              color="yellow";
+          }else if(num==4){
+              color="green";
+          }else if(num==5){
+              color="deepskyblue";
+          }else if(num==6){
+              color="blue";
+          }else if(num==7){
+              color="purple";
+          }else if(num==8){
+              color="slategray";
+          }else if(num==9){
+              color="brown";
+          }
+        var dynDiv = document.createElement("div");
+        dynDiv.id = user_id;
+        dynDiv.innerHTML = name;
+
+        dynDiv.style.color =color;
+        dynDiv.style.height = "20px";
+        dynDiv.style.width = "60px";
+        dynDiv.style.backgroundColor = 'black';
+        document.body.appendChild(dynDiv);
+      }
+
       function connect() {
         disconnect();
 
         conn = new SockJS('http://' + window.location.host + '/chat', "websocket");
 
 
+
         conn.onopen = function() {
+            DynamicDiv(10,"Myself",-1);
         };
 
         conn.onmessage = function(e) {
@@ -64,14 +160,21 @@
                 var column1= co.column;
                 var column2=column1 +1;
                 var myrange=new r(row,column1,row,column2);
-                var markid=editor.session.addMarker(myrange,"ace_cursor","text");
+                var num=co.user_id % 10;
+                var markid=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
                 users[co.user_id]=markid;
+                DynamicDiv(num,co.name,co.user_id);
             }
             else if(co.act == "remove_cursor"){
 //                console.log(co);
                 var markid=users[co.user_id];
                 users[co.user_id]=-1;
                 editor.session.removeMarker(markid);
+                var oldelement=document.getElementById(co.user_id);
+                if (oldelement) {
+                    oldelement.parentNode.removeChild(oldelement);
+                }
+
             }
             else if(co.act == 'move_cursor'){
 //                console.log(co);
@@ -82,7 +185,8 @@
                 var column1= co.column;
                 var column2=column1 +1;
                 var myrange=new r(row,column1,row,column2);
-                var markid=editor.session.addMarker(myrange,"ace_cursor","text");
+                var num=co.user_id % 10;
+                var markid=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
                 users[co.user_id]=markid;
             }
             else if(co.act == 'change_selection'){
@@ -94,7 +198,8 @@
                 var column1= co.start_column;
                 var column2=co.end_column;
                 var myrange=new r(row1,column1,row2,column2);
-                var markid=editor.session.addMarker(myrange,"ace_selection","text");
+                var num=co.user_id % 10;
+                var markid=editor.session.addMarker(myrange,"user_"+num+" ace_selection","text");
                 users[co.user_id]=markid;
             }
             else {
@@ -149,6 +254,7 @@
 //        setTimeout(function(){
         if(!from_message){
             conn.send(JSON.stringify(e.data )+ '\r\n');
+            console.log(e.data)
         }
 //        },1);
        });
