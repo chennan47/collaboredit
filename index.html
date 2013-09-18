@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+  <script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
+  <script src="http://ajax.cdnjs.com/ajax/libs/json2/20110223/json2.js"></script>
+
+
+</head>
+<body>
+<h3>Collaborative Editor!</h3>
+
+<style type="text/css" media="screen">
+  .ace_marker-layer.ace-bracket{
+      position:absolute;
+      z-index:5;
+  }
+  #editor {
+            height: 300px;
+            /*min-width: 275px;*/
+            display: block;
+            position:relative;
+	      }
+</style>
+
+
+
+<div id="editor">
+</div>
+
+<script src="/static/src-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+
+<script>
+      ace.require("ace/lib/fixoldbrowsers");
+     var editor = ace.edit("editor");
+      editor.setTheme("ace/theme/monokai");
+//     editor.getSession().setMode("ace/mode/javascript");
+
+
+    $(function() {
+      var conn = null;
+      var  from_message = false;
+      var  from_cursor = false;
+
+      var r=ace.require('ace/range').Range;
+      var users=[];
+
+      function connect() {
+        disconnect();
+
+        conn = new SockJS('http://' + window.location.host + '/chat', "websocket");
+
+
+        conn.onopen = function() {
+        };
+
+        conn.onmessage = function(e) {
+
+//            console.log(e.data);
+            var co = JSON.parse(e.data);
+            if (co.act == "create_cursor"){
+//                console.log(co);
+                var row= co.row;
+                var column1= co.column;
+                var column2=column1 +1;
+                var myrange=new r(row,column1,row,column2);
+                var markid=editor.session.addMarker(myrange,"ace_cursor","text");
+                users[co.user_id]=markid;
+            }
+            else if(co.act == "remove_cursor"){
+//                console.log(co);
+                var markid=users[co.user_id];
+                users[co.user_id]=-1;
+                editor.session.removeMarker(markid);
+            }
+            else if(co.act == 'move_cursor'){
+//                console.log(co);
+                var markid=users[co.user_id];
+                editor.session.removeMarker(markid);
+
+                var row= co.row;
+                var column1= co.column;
+                var column2=column1 +1;
+                var myrange=new r(row,column1,row,column2);
+                var markid=editor.session.addMarker(myrange,"ace_cursor","text");
+                users[co.user_id]=markid;
+            }
+            else if(co.act == 'change_selection'){
+                var markid=users[co.user_id];
+                editor.session.removeMarker(markid);
+
+                var row1= co.start_row;
+                var row2= co.end_row;
+                var column1= co.start_column;
+                var column2=co.end_column;
+                var myrange=new r(row1,column1,row2,column2);
+                var markid=editor.session.addMarker(myrange,"ace_selection","text");
+                users[co.user_id]=markid;
+            }
+            else {
+//                console.log(co);
+                var c= editor.getCursorPosition();
+                from_message = true;
+                if((co.range.start.row< c.row)
+                        || (co.range.end.row< c.row)
+                        || (co.range.start.column< c.column)
+                        ||(co.range.end.column< c.column)){
+                        editor.getSession().getDocument().applyDeltas([co]);
+                }
+                else{
+                    editor.getSession().getDocument().applyDeltas([co]);
+                    editor.getSelection().moveCursorTo(c.row, c.column,true);
+                }
+                from_message = false;
+            }
+
+
+
+        };
+
+        conn.onclose = function() {
+
+          conn = null;
+
+        };
+
+
+
+      }
+
+      function disconnect() {
+        if (conn != null) {
+          conn.close();
+          conn = null;
+        }
+      }
+
+
+      $(function() {
+        if (conn == null) {
+          connect();
+        }
+        return false;
+      });
+
+
+       editor.getSession().getDocument().on('change', function(e){
+
+//        setTimeout(function(){
+        if(!from_message){
+            conn.send(JSON.stringify(e.data )+ '\r\n');
+        }
+//        },1);
+       });
+
+
+       editor.getSelection().on('changeCursor', function() {
+            setTimeout(function() {
+                if(!from_cursor){
+                    var oldrange=editor.getSelection().getRange();
+                    if((oldrange.start.row==oldrange.end.row) && (oldrange.start.column==oldrange.end.column)){
+                        conn.send(JSON.stringify(editor.getSelection().getCursor())+ '\r\n');
+                    }else{
+//                         var judge= editor.selection.isBackwards();
+//                         if(!judge){
+                            conn.send(JSON.stringify(editor.getSelection().getRange())+ '\r\n');
+//                         }
+//                         else{
+//                            var newrange=new r(oldrange.end.row,oldrange.end.column,oldrange.start.row,oldrange.start.column);
+//                            conn.send(JSON.stringify(newrange)+ '\r\n');
+//                       }
+                    }
+
+                }
+            },1);
+        });
+
+
+
+
+
+    });
+</script>
+</body>
+</html>
