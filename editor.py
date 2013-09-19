@@ -81,8 +81,15 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
 
     def on_message(self, message):
-         # print(message)
-        if ("action" in message):
+        print(message);
+        if("correction" in message):
+            self.broadcast((x for x in self.participants if x != self),
+                           json.dumps({
+                               'act': 'correction',
+                               'info': message
+                           })
+                           )
+        elif ("action" in message):
             self.broadcast((x for x in self.participants if x != self), message)
             self.board.append(message)
 
@@ -134,6 +141,14 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
         self.users.pop(self.participants.index(self))
         self.participants.remove(self)
 
+def poll(c):
+
+    c.broadcast(
+        (x for x in c._connection.participants
+         if x== c._connection.participants[0] and len(c._connection.participants)>1),
+        json.dumps({'act':'getValue',}),
+    )
+
 
 
 if __name__ == "__main__":
@@ -153,5 +168,14 @@ if __name__ == "__main__":
     # 3. Make Tornado app listen on port 8080
     app.listen(8080)
 
+    main_loop=tornado.ioloop.IOLoop.instance()
+
+    pinger = tornado.ioloop.PeriodicCallback(
+        lambda: poll(ChatRouter),
+        500,
+        io_loop=main_loop,
+    )
+
+    pinger.start()
     # 4. Start IOLoop
-    tornado.ioloop.IOLoop.instance().start()
+    main_loop.start()
