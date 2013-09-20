@@ -7,6 +7,7 @@ import tornado.web
 import json
 import sockjs.tornado
 from collections import namedtuple
+import time
 import json
 from uuid import uuid4
 
@@ -53,6 +54,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
     participants = [];
     users = [];
     board=[];
+    checks=set();
 
     def on_open(self, info):
 
@@ -81,19 +83,25 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
 
     def on_message(self, message):
-        print(message);
+
         if("correction" in message):
+            # print("correct"+message);
             self.broadcast((x for x in self.participants if x != self),
                            json.dumps({
                                'act': 'correction',
                                'info': message
                            })
                            )
+
         elif ("action" in message):
+            # print(message+"typing");
+            self.checks.add(self);
             self.broadcast((x for x in self.participants if x != self), message)
             self.board.append(message)
 
+
         elif("start" in message):
+            # print(message);
             cursor=json.loads(message)
             start=cursor['start']
             end=cursor['end']
@@ -112,6 +120,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             self.board.append(constructor)
 
         else:
+            # print(message+"mouse");
             cursor=json.loads(message)
             constructor=json.dumps({
                     'act': 'move_cursor',
@@ -145,10 +154,11 @@ def poll(c):
 
     c.broadcast(
         (x for x in c._connection.participants
-         if x== c._connection.participants[0] and len(c._connection.participants)>1),
+         if x== c._connection.participants[0] and len(c._connection.participants)>1and len(c._connection.checks)>1),
         json.dumps({'act':'getValue',}),
     )
 
+    c._connection.checks.clear()
 
 
 if __name__ == "__main__":
@@ -172,7 +182,7 @@ if __name__ == "__main__":
 
     pinger = tornado.ioloop.PeriodicCallback(
         lambda: poll(ChatRouter),
-        500,
+        800,
         io_loop=main_loop,
     )
 
