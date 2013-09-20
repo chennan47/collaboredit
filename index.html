@@ -15,63 +15,7 @@
   div.user_1.ace_cursor {
         border-left-color: red;
   }
-   /*div.user_2.ace_cursor {*/
-        /*border-left-color: orange;*/
-  /*}*/
-   /*div.user_3.ace_cursor {*/
-        /*border-left-color: yellow;*/
-  /*}*/
-    /*div.user_4.ace_cursor {*/
-        /*border-left-color: green;*/
-  /*}*/
-    /*div.user_5.ace_cursor {*/
-        /*border-left-color: deepskyblue;*/
-  /*}*/
-    /*div.user_6.ace_cursor {*/
-        /*border-left-color: blue;*/
-  /*}*/
-    /*div.user_7.ace_cursor {*/
-        /*border-left-color: purple;*/
-  /*}*/
-     /*div.user_8.ace_cursor {*/
-        /*border-left-color: slategray;*/
-  /*}*/
-     /*div.user_9.ace_cursor {*/
-        /*border-left-color: brown;*/
-  /*}*/
-     /*div.user_0.ace_cursor {*/
-        /*border-left-color: sandybrown;*/
-  /*}*/
-   /*div.ace_marker-layer div.user_1.ace_selection {*/
-        /*background: red;*/
-  /*}*/
-   /*div.ace_marker-layer div.user_2.ace_selection {*/
-        /*background: orange;*/
-  /*}*/
-   /*div.ace_marker-layer div.user_3.ace_selection {*/
-        /*background: yellow;*/
-  /*}*/
-    /*div.ace_marker-layer div.user_4.ace_selection {*/
-        /*background: green;*/
-  /*}*/
-    /*div.ace_marker-layer div.user_5.ace_selection {*/
-        /*background: deepskyblue;*/
-  /*}*/
-    /*div.ace_marker-layer div.user_6.ace_selection {*/
-        /*background: blue;*/
-  /*}*/
-    /*div.ace_marker-layer div.user_7.ace_selection {*/
-        /*background: purple;*/
-  /*}*/
-     /*div.ace_marker-layer div.user_8.ace_selection {*/
-        /*background: slategray;*/
-  /*}*/
-     /*div.ace_marker-layer div.user_9.ace_selection {*/
-        /*background: brown;*/
-  /*}*/
-     /*div.ace_marker-layer div.user_0.ace_selection {*/
-        /*background: sandybrown;*/
-  /*}*/
+
 
 
 </style>
@@ -88,7 +32,7 @@
       ace.require("ace/lib/fixoldbrowsers");
      var editor = ace.edit("editor");
       editor.setTheme("ace/theme/monokai");
-//     editor.getSession().setMode("ace/mode/javascript");
+
 
 
     $(function() {
@@ -159,13 +103,13 @@
         };
 
         conn.onmessage = function(e) {
-
+                console.log(e.data)
                var co = JSON.parse(e.data);
                if (co.act == "correction"){
 
 
-                   var m=co.info.replace("correction","");
-                   var n=JSON.parse(m);
+                   console.log(co.info);
+                   var n=JSON.parse(co.info);
 
                     if (n!=(editor.getValue())){
 
@@ -195,7 +139,7 @@
                 }
                 else if(co.act == "getValue"){
 
-                   conn.send(JSON.stringify("correction"+editor.getValue()));
+                   conn.send(JSON.stringify("user_0_client_text"+editor.getValue()));
                 }
                 else if (co.act == "create_cursor"){
 //                console.log(co);

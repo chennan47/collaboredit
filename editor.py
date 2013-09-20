@@ -15,6 +15,7 @@ Cursor = namedtuple('Cursor', ('row', 'column'))
 
 users = []
 
+
 class User(object):
     _cursor = None
 
@@ -51,10 +52,16 @@ class IndexHandler(tornado.web.RequestHandler):
 class ChatConnection(sockjs.tornado.SockJSConnection):
     """Chat connection implementation"""
     # Class level variable
-    participants = [];
-    users = [];
-    board=[];
-    checks=set();
+    participants = []
+    users = []
+    board=[]
+    checks=set()
+    clientText=""
+    cursorCreate=[]
+    cursorPosition=[]
+    messagecheck=[]
+    comtimefix=[]
+    change=False
 
     def on_open(self, info):
 
@@ -62,42 +69,107 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
         self.participants.append(self)
 
         self.users.append(User())
-
+        index=len(users)-1
         constructor=json.dumps({
                 'act': 'create_cursor',
-                'name': self.users[len(users)-1].username,
-                'user_id': self.users[len(users)-1].id,
-                'row': self.users[len(users)-1].cursor.row,
-                'column': self.users[len(users)-1].cursor.column
+                'name': self.users[index].username,
+                'user_id': self.users[index].id,
+                'row': self.users[index].cursor.row,
+                'column': self.users[index].cursor.column
             })
+
 
         self.broadcast(
             (x for x in self.participants if x != self),
             constructor,
         )
+
+
+        self.broadcast(
+            (x for x in self.participants if x == self),
+            json.dumps({
+                               'act': 'correction',
+                               'info': ChatConnection.clientText
+                           })
+        )
+
         for a in self.board:
 
             self.broadcast((x for x in self.participants if x == self), a)
 
-        self.board.append(constructor)
+        for a in self.cursorCreate:
+
+            self.broadcast((x for x in self.participants if x == self), a[1])
+
+        for a in self.cursorPosition:
+
+            self.broadcast((x for x in self.participants if x == self), a[1])
+
+        self.cursorCreate.append((self.users[index].id,constructor))
 
 
     def on_message(self, message):
 
-        if("correction" in message):
-            # print("correct"+message);
-            self.broadcast((x for x in self.participants if x != self),
+        if("user_0_client_text" in message):
+            # print(message)
+            m=message.replace("user_0_client_text","")
+
+
+            ChatConnection.clientText=m
+
+            if (len(self.participants)>1and len(self.checks)>1):
+                for index,first in enumerate(self.messagecheck):
+                    for second in self.messagecheck[(index+1):]:
+                            if first[0]!=second[0] and first[1]==second[1]:
+                                ChatConnection.change=True
+                                break
+                    if(ChatConnection.change):
+                        break
+
+            if(ChatConnection.change):
+                self.broadcast((x for x in self.participants if x != self),
                            json.dumps({
                                'act': 'correction',
-                               'info': message
+                               'info': ChatConnection.clientText
                            })
-                           )
+                )
+                for a in self.comtimefix:
+
+                    self.broadcast((x for x in self.participants if x == self), a)
+                ChatConnection.change=False
+
+            del self.messagecheck[:]
+            self.checks.clear()
+            del self.comtimefix[:]
 
         elif ("action" in message):
             # print(message+"typing");
             self.checks.add(self);
             self.broadcast((x for x in self.participants if x != self), message)
             self.board.append(message)
+            self.comtimefix.append(message)
+
+            delta=json.loads(message)
+            range=delta['range']
+            start=range['start']
+            end=range['end']
+            start_row=start['row']
+            end_row=end['row']
+
+            if(start_row == end_row):
+                self.messagecheck.append(
+                    (self.users[self.participants.index(self)].id,
+                    start_row)
+                )
+            else:
+                 self.messagecheck.append(
+                    (self.users[self.participants.index(self)].id,
+                    start_row)
+                )
+                 self.messagecheck.append(
+                    (self.users[self.participants.index(self)].id,
+                    end_row)
+                )
 
 
         elif("start" in message):
@@ -117,10 +189,22 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 (x for x in self.participants if x != self),
                 constructor,
             )
-            self.board.append(constructor)
+
+            for x in self.cursorPosition:
+
+                if (x[0]==self.users[self.participants.index(self)].id):
+
+                    self.cursorPosition.remove(x)
+
+            self.cursorPosition.append(
+                (self.users[self.participants.index(self)].id,
+                constructor)
+            )
+
+
 
         else:
-            # print(message+"mouse");
+
             cursor=json.loads(message)
             constructor=json.dumps({
                     'act': 'move_cursor',
@@ -132,7 +216,17 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 (x for x in self.participants if x != self),
                 constructor,
             )
-            self.board.append(constructor)
+
+            for x in self.cursorPosition:
+
+                if (x[0]==self.users[self.participants.index(self)].id):
+
+                    self.cursorPosition.remove(x)
+
+            self.cursorPosition.append(
+                (self.users[self.participants.index(self)].id,
+                constructor)
+            )
 
 
     def on_close(self):
@@ -144,7 +238,18 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             (x for x in self.participants if x != self),
             constructor,
         )
-        self.board.append(constructor)
+
+        for x in self.cursorCreate:
+
+                if (x[0]==self.users[self.participants.index(self)].id):
+
+                    self.cursorCreate.remove(x)
+
+        for x in self.cursorPosition:
+
+                if (x[0]==self.users[self.participants.index(self)].id):
+
+                    self.cursorPosition.remove(x)
 
         # Remove client from the clients list and broadcast leave message
         self.users.pop(self.participants.index(self))
@@ -152,13 +257,18 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
 def poll(c):
 
+    # c.broadcast(
+    #     (x for x in c._connection.participants
+    #      if x== c._connection.participants[0] and len(c._connection.participants)>1and len(c._connection.checks)>1),
+    #     json.dumps({'act':'getValue',}),
+    # )
+    del c._connection.comtimefix[:]
     c.broadcast(
-        (x for x in c._connection.participants
-         if x== c._connection.participants[0] and len(c._connection.participants)>1and len(c._connection.checks)>1),
+        (x for x in c._connection.participants if x== c._connection.participants[0] ),
         json.dumps({'act':'getValue',}),
     )
 
-    c._connection.checks.clear()
+    del c._connection.board[:]
 
 
 if __name__ == "__main__":
@@ -182,9 +292,10 @@ if __name__ == "__main__":
 
     pinger = tornado.ioloop.PeriodicCallback(
         lambda: poll(ChatRouter),
-        800,
+        1000,
         io_loop=main_loop,
     )
+
 
     pinger.start()
     # 4. Start IOLoop
