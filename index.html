@@ -11,13 +11,9 @@
 <h3>Collaborative Editor!</h3>
 
 <style id='my_style' type="text/css" media="screen">
-
   div.user_1.ace_cursor {
         border-left-color: red;
   }
-
-
-
 </style>
 
 
@@ -40,13 +36,12 @@
       var  from_message = false;
       var  check1=false;
       var  check2=false;
-      var check3=false;
-      var check4=false;
       var applychange=false;
       var  from_cursor = false;
       var colorstack=[];
       var r=ace.require('ace/range').Range;
       var users=[];
+
 
        $(function() {
       var css = $('#my_style')[0];
@@ -55,7 +50,7 @@
       var rules = ' #editor {height: 300px; display: block; position:relative;}';
       var rule2='';
 
-      for (var i=0; i < 100; i++){
+      for (var i=0; i < 200; i++){
       var a = 5*Math.floor(Math.random() * 4)
       var b = 5*Math.floor(Math.random() * 4)
       var c = 5*Math.floor(Math.random() * 4)
@@ -75,6 +70,7 @@
            css.innerHTML = rules;
        });
 
+
       function DynamicDiv(num,name,user_id) {
           var color="gray";
             if(user_id!=-1){
@@ -91,24 +87,24 @@
         document.body.appendChild(dynDiv);
       }
 
+
       function connect() {
         disconnect();
 
         conn = new SockJS('http://' + window.location.host + '/chat', "websocket");
 
 
-
         conn.onopen = function() {
             DynamicDiv(-1,"Myself",-1);
         };
 
+
         conn.onmessage = function(e) {
-                console.log(e.data)
+//                console.log(e.data)
                var co = JSON.parse(e.data);
                if (co.act == "correction"){
 
-
-                   console.log(co.info);
+//                  console.log(co.info);
                    var n=JSON.parse(co.info);
 
                     if (n!=(editor.getValue())){
@@ -119,12 +115,10 @@
                             check1=true;
                             check2=true;
 //                            editor.setReadOnly(true);
-//                         console.log("fixed")
+
                             var p=editor.getSelection().getCursor();
 
                             editor.setValue(n);
-
-
 
                             editor.clearSelection();
                             editor.getSelection().moveCursorToScreen(p.row, p.column,false);
@@ -134,7 +128,6 @@
                             from_cursor=false;
                             applychange=false;
 
-
                     }
                 }
                 else if(co.act == "getValue"){
@@ -142,18 +135,18 @@
                    conn.send(JSON.stringify("user_0_client_text"+editor.getValue()));
                 }
                 else if (co.act == "create_cursor"){
-//                console.log(co);
+
                     var row= co.row;
                     var column1= co.column;
                     var column2=column1 +1;
                     var myrange=new r(row,column1,row,column2);
-                    var num=co.user_id % 100;
+                    var num=co.user_id % 200;
                     var markid=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
                     users[co.user_id]=markid;
                     DynamicDiv(num,co.name,co.user_id);
                 }
                 else if(co.act == "remove_cursor"){
-//                console.log(co);
+
                     var markid=users[co.user_id];
                     users[co.user_id]=-1;
                     editor.session.removeMarker(markid);
@@ -164,7 +157,7 @@
 
                 }
                 else if(co.act == 'move_cursor'){
-                console.log("2");
+
                    from_cursor=true;
                     var markid=users[co.user_id];
                     editor.session.removeMarker(markid);
@@ -173,7 +166,7 @@
                     var column1= co.column;
                     var column2=column1 +1;
                     var myrange=new r(row,column1,row,column2);
-                    var num=co.user_id % 100;
+                    var num=co.user_id % 200;
                     var markid=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
                     users[co.user_id]=markid;
                    from_cursor=false;
@@ -187,12 +180,12 @@
                     var column1= co.start_column;
                     var column2=co.end_column;
                     var myrange=new r(row1,column1,row2,column2);
-                    var num=co.user_id % 100;
+                    var num=co.user_id % 200;
                     var markid=editor.session.addMarker(myrange,"user_"+num+" ace_selection","text");
                     users[co.user_id]=markid;
                 }
                 else {
-//                console.log(co);
+
                     var c= editor.getCursorPosition();
 
                     from_message = true;
@@ -200,11 +193,11 @@
                         || (co.range.end.row< c.row)
                         || (co.range.start.column< c.column)
                         ||(co.range.end.column< c.column)){
-                        console.log("3");
+
                             editor.getSession().getDocument().applyDeltas([co]);
                     }
                     else{
-                        console.log("4");
+
                         from_cursor=true;
                         editor.getSession().getDocument().applyDeltas([co]);
 
@@ -213,21 +206,14 @@
                     }
                     from_message = false;
                 }
-
-
-
-
         };
+
 
         conn.onclose = function() {
-
-          conn = null;
-
+            conn = null;
         };
-
-
-
       }
+
 
       function disconnect() {
         if (conn != null) {
@@ -247,38 +233,24 @@
 
        editor.getSession().getDocument().on('change', function(e){
            if(!from_message&&!applychange&&!from_cursor){
-
-
                     conn.send(JSON.stringify(e.data )+ '\r\n');
-
             }
        });
 
 
        editor.getSelection().on('changeCursor', function() {
             if(!from_cursor&&!applychange){
-
-                        setTimeout(function() {
-
-                            var oldrange=editor.getSelection().getRange();
-                            if((oldrange.start.row==oldrange.end.row) && (oldrange.start.column==oldrange.end.column)){
-                                conn.send(JSON.stringify(editor.getSelection().getCursor())+ '\r\n');
-                            }else{
-
-                                conn.send(JSON.stringify(editor.getSelection().getRange())+ '\r\n');
-
-
-                            }
-
-
-                        },1)
-                    };
+                setTimeout(function() {
+                    var oldrange=editor.getSelection().getRange();
+                    if((oldrange.start.row==oldrange.end.row) && (oldrange.start.column==oldrange.end.column)){
+                        conn.send(JSON.stringify(editor.getSelection().getCursor())+ '\r\n');
+                    }else{
+                        conn.send(JSON.stringify(editor.getSelection().getRange())+ '\r\n');
+                    }
+                },1)
+            };
 
         });
-
-
-
-
 
     });
 </script>

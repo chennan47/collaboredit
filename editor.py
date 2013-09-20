@@ -41,12 +41,11 @@ class User(object):
 
 
 
-
-
 class IndexHandler(tornado.web.RequestHandler):
     """Regular HTTP handler to serve the chatroom page"""
     def get(self):
         self.render('index.html')
+
 
 
 class ChatConnection(sockjs.tornado.SockJSConnection):
@@ -62,6 +61,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
     messagecheck=[]
     comtimefix=[]
     change=False
+
 
     def on_open(self, info):
 
@@ -83,7 +83,6 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             (x for x in self.participants if x != self),
             constructor,
         )
-
 
         self.broadcast(
             (x for x in self.participants if x == self),
@@ -108,12 +107,12 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
         self.cursorCreate.append((self.users[index].id,constructor))
 
 
+
     def on_message(self, message):
 
         if("user_0_client_text" in message):
             # print(message)
             m=message.replace("user_0_client_text","")
-
 
             ChatConnection.clientText=m
 
@@ -201,8 +200,6 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 constructor)
             )
 
-
-
         else:
 
             cursor=json.loads(message)
@@ -257,11 +254,6 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
 def poll(c):
 
-    # c.broadcast(
-    #     (x for x in c._connection.participants
-    #      if x== c._connection.participants[0] and len(c._connection.participants)>1and len(c._connection.checks)>1),
-    #     json.dumps({'act':'getValue',}),
-    # )
     del c._connection.comtimefix[:]
     c.broadcast(
         (x for x in c._connection.participants if x== c._connection.participants[0] ),
@@ -295,7 +287,6 @@ if __name__ == "__main__":
         1000,
         io_loop=main_loop,
     )
-
 
     pinger.start()
     # 4. Start IOLoop
