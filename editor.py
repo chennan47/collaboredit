@@ -15,7 +15,7 @@ Cursor = namedtuple('Cursor', ('row', 'column'))
 
 users = []
 
-
+# user class definition
 class User(object):
     _cursor = None
 
@@ -47,7 +47,7 @@ class IndexHandler(tornado.web.RequestHandler):
         self.render('index.html')
 
 
-
+# ChatConnection class
 class ChatConnection(sockjs.tornado.SockJSConnection):
     """Chat connection implementation"""
     # Class level variable
@@ -67,9 +67,10 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
         # Add client to the clients list
         self.participants.append(self)
-
+        # Create user and add it to the user list
         self.users.append(User())
         index=len(users)-1
+        # create new user's cursor on other user's screen
         constructor=json.dumps({
                 'act': 'create_cursor',
                 'name': self.users[index].username,
@@ -78,44 +79,53 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 'column': self.users[index].cursor.column
             })
 
-
+        # broad the new user's cursor to other user'
         self.broadcast(
             (x for x in self.participants if x != self),
             constructor,
         )
 
+        # setup clienttext to the new user
         self.broadcast(
             (x for x in self.participants if x == self),
             json.dumps({
-                               'act': 'correction',
+                               'act': 'startup',
                                'info': ChatConnection.clientText
                            })
         )
 
+        # setup the modification of the client text to the new user
         for a in self.board:
 
             self.broadcast((x for x in self.participants if x == self), a)
 
+        #setup the users' cursor to the new user
         for a in self.cursorCreate:
 
             self.broadcast((x for x in self.participants if x == self), a[1])
 
+        # update the users' lastest cursor position to the new user
         for a in self.cursorPosition:
 
             self.broadcast((x for x in self.participants if x == self), a[1])
 
+        # add the new user's cursor to the cursor list
         self.cursorCreate.append((self.users[index].id,constructor))
 
 
 
     def on_message(self, message):
 
+        #update the client text and check if need to reset other user's screen
         if("user_0_client_text" in message):
-            # print(message)
+
+            #remove the pattern from the client text
             m=message.replace("user_0_client_text","")
 
             ChatConnection.clientText=m
 
+            #check if there are more than one user and if during the period there are more than two users editing
+            # and whether there are more than one user editing the same line
             if (len(self.participants)>1and len(self.checks)>1):
                 for index,first in enumerate(self.messagecheck):
                     for second in self.messagecheck[(index+1):]:
@@ -125,6 +135,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                     if(ChatConnection.change):
                         break
 
+            # if the check find the situation meet the condition then reset the users' text
             if(ChatConnection.change):
                 self.broadcast((x for x in self.participants if x != self),
                            json.dumps({
@@ -137,17 +148,21 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                     self.broadcast((x for x in self.participants if x == self), a)
                 ChatConnection.change=False
 
+            #clear the stack
             del self.messagecheck[:]
             self.checks.clear()
             del self.comtimefix[:]
 
+        #deal with the new input from the user
         elif ("action" in message):
-            # print(message+"typing");
+
+            #apply the change and add certain info to the stack
             self.checks.add(self);
             self.broadcast((x for x in self.participants if x != self), message)
             self.board.append(message)
             self.comtimefix.append(message)
 
+            # record and analysize the message for the message check
             delta=json.loads(message)
             range=delta['range']
             start=range['start']
@@ -171,6 +186,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 )
 
 
+        #deal with the new mouse selection action of the user and record it to the stack
         elif("start" in message):
             # print(message);
             cursor=json.loads(message)
@@ -200,6 +216,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 constructor)
             )
 
+        #deal with the new mouse move action of the user and record it to the stack
         else:
 
             cursor=json.loads(message)
@@ -225,7 +242,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 constructor)
             )
 
-
+    #remove the user from the user list when disconnect and remove it from the cursor list
     def on_close(self):
         constructor=json.dumps({
                 'act': 'remove_cursor',
@@ -248,10 +265,11 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
                     self.cursorPosition.remove(x)
 
-        # Remove client from the clients list and broadcast leave message
+        # Remove client from the clients list
         self.users.pop(self.participants.index(self))
         self.participants.remove(self)
 
+#period call to get update the client text
 def poll(c):
 
     del c._connection.comtimefix[:]
@@ -282,6 +300,7 @@ if __name__ == "__main__":
 
     main_loop=tornado.ioloop.IOLoop.instance()
 
+    #period call setup
     pinger = tornado.ioloop.PeriodicCallback(
         lambda: poll(ChatRouter),
         1000,

@@ -25,6 +25,8 @@
 <script src="/static/src-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
 
 <script>
+
+//    base ace setup
       ace.require("ace/lib/fixoldbrowsers");
      var editor = ace.edit("editor");
       editor.setTheme("ace/theme/monokai");
@@ -43,6 +45,7 @@
       var users=[];
 
 
+//       dinamically distribute color to users
        $(function() {
       var css = $('#my_style')[0];
 
@@ -71,6 +74,7 @@
        });
 
 
+//      dynamically add new div fro the new user
       function DynamicDiv(num,name,user_id) {
           var color="gray";
             if(user_id!=-1){
@@ -88,21 +92,53 @@
       }
 
 
+//      connection function
       function connect() {
         disconnect();
 
         conn = new SockJS('http://' + window.location.host + '/chat', "websocket");
 
 
+//        on open create a div for the user self
         conn.onopen = function() {
             DynamicDiv(-1,"Myself",-1);
         };
 
 
+//         deal with the message get from the server
         conn.onmessage = function(e) {
 //                console.log(e.data)
                var co = JSON.parse(e.data);
-               if (co.act == "correction"){
+
+//               setup the clienttext for the new user
+               if (co.act == "startup"){
+
+//                  console.log(co.info);
+                   var n=JSON.parse(co.info);
+
+                    if (n!=(editor.getValue())){
+
+                            from_cursor=true;
+                            applychange=true;
+                            from_message=true;
+                            check1=true;
+                            check2=true;
+//                            editor.setReadOnly(true)
+
+                            editor.setValue(n);
+
+                            editor.clearSelection();
+                            editor.getSelection().moveCursorToScreen(0, 0,false);
+
+//                            setTimeout(function(){editor.setReadOnly(false)},800);
+                            from_message=false;
+                            from_cursor=false;
+                            applychange=false;
+
+                    }
+                }
+//               doing the correction for the collison
+               else if (co.act == "correction"){
 
 //                  console.log(co.info);
                    var n=JSON.parse(co.info);
@@ -130,10 +166,12 @@
 
                     }
                 }
+//                update the client text
                 else if(co.act == "getValue"){
 
                    conn.send(JSON.stringify("user_0_client_text"+editor.getValue()));
                 }
+//               create the cursor for the new user
                 else if (co.act == "create_cursor"){
 
                     var row= co.row;
@@ -145,6 +183,8 @@
                     users[co.user_id]=markid;
                     DynamicDiv(num,co.name,co.user_id);
                 }
+
+//                remove the cursor for the disconnected user
                 else if(co.act == "remove_cursor"){
 
                     var markid=users[co.user_id];
@@ -156,6 +196,8 @@
                     }
 
                 }
+
+//                   move the user's cursor accordingly
                 else if(co.act == 'move_cursor'){
 
                    from_cursor=true;
@@ -171,6 +213,8 @@
                     users[co.user_id]=markid;
                    from_cursor=false;
                 }
+
+//                  make a selection accordingly
                 else if(co.act == 'change_selection'){
                     var markid=users[co.user_id];
                     editor.session.removeMarker(markid);
@@ -184,6 +228,8 @@
                     var markid=editor.session.addMarker(myrange,"user_"+num+" ace_selection","text");
                     users[co.user_id]=markid;
                 }
+
+//                deal with the message change
                 else {
 
                     var c= editor.getCursorPosition();
@@ -208,13 +254,13 @@
                 }
         };
 
-
+//        when close set the conn to null
         conn.onclose = function() {
             conn = null;
         };
       }
 
-
+//        disconnect function
       function disconnect() {
         if (conn != null) {
           conn.close();
@@ -222,7 +268,7 @@
         }
       }
 
-
+//       auto connect when the page refresh
       $(function() {
         if (conn == null) {
           connect();
@@ -230,7 +276,7 @@
         return false;
       });
 
-
+//        send the info to the server when there is a new type in
        editor.getSession().getDocument().on('change', function(e){
            if(!from_message&&!applychange&&!from_cursor){
                     conn.send(JSON.stringify(e.data )+ '\r\n');
@@ -238,6 +284,7 @@
        });
 
 
+//        send info to the server when there is a cursor change
        editor.getSelection().on('changeCursor', function() {
             if(!from_cursor&&!applychange){
                 setTimeout(function() {
