@@ -147,16 +147,16 @@
         conn.onmessage = function(e) {
 
                //load the message
-               var co = JSON.parse(e.data);
+               var message = JSON.parse(e.data);
 
                //setup the client text for the new connected user
-               if (co.act == "startup"){
+               if (message.act == "startup"){
 
                     //load the text
-                   var n=JSON.parse(co.info);
+                   var string_message=JSON.parse(message.info);
 
                     //check if the client text is the same with the user's text
-                    if (n!=(editor.getValue())){
+                    if (string_message!=(editor.getValue())){
 
                             //forbid the info send to server before the change is applied
                             from_cursor=true;
@@ -166,7 +166,7 @@
                                  //maybe useful for future: editor.setReadOnly(true)
 
                             //set the text to be the client text
-                            editor.setValue(n);
+                            editor.setValue(string_message);
 
                             //after the text is resetted clear mouse selection
                             editor.clearSelection();
@@ -184,13 +184,13 @@
                     }
                 }
                 //doing the correction for the collison
-               else if (co.act == "correction"){
+               else if (message.act == "correction"){
 
                    //load the text
-                   var n=JSON.parse(co.info);
+                   var string_message=JSON.parse(message.info);
 
                     //check if the client text is the same with the user's text
-                    if (n!=(editor.getValue())){
+                    if (string_message!=(editor.getValue())){
 
                             //forbid the info send to server before the change is applied
                             from_cursor=true;
@@ -200,16 +200,16 @@
                                 //maybe useful for future: editor.setReadOnly(true);
 
                             //get the cursor's current position
-                            var p=editor.getSelection().getCursor();
+                            var position=editor.getSelection().getCursor();
 
                             //reset the text to be the client text
-                            editor.setValue(n);
+                            editor.setValue(string_message);
 
                             //after the text is resetted clear mouse selection
                             editor.clearSelection();
 
                             //get the mouse back to the original position
-                            editor.getSelection().moveCursorToScreen(p.row, p.column,false);
+                            editor.getSelection().moveCursorToScreen(position.row, position.column,false);
 
                                 //maybe useful for future: setTimeout(function(){editor.setReadOnly(false)},800);
 
@@ -220,49 +220,49 @@
 
                     }
                 }
-                //update the client text
-                else if(co.act == "getValue"){
-
-                   //send the text to the server and add a tag for server to know how to handle it
-                   conn.send(JSON.stringify("user_0_client_text"+editor.getValue()));
-                }
+//                //get the user text value not useful for now maybe useful later
+//                else if(message.act == "getValue"){
+//
+//                   //send the text to the server and add a tag for server to know how to handle it
+//                   conn.send(JSON.stringify("user_0_client_text"+editor.getValue()));
+//                }
 
                 //create the cursor for the new user
-                else if (co.act == "create_cursor"){
+                else if (message.act == "create_cursor"){
 
                     //build up the range object of the cursor
-                    var row= co.row;
-                    var column1= co.column;
+                    var row= message.row;
+                    var messagelumn1= message.column;
                     var column2=column1 +1;
                     var myrange=new r(row,column1,row,column2);
 
                     //get the css style num for the user
-                    var num=co.user_id % 200;
+                    var num=message.user_id % 200;
 
                     //add the cursor to the screen
-                    var markid=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
+                    var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
 
                     //record the cursor id in the users list by index to be user id
-                    users[co.user_id]=markid;
+                    users[message.user_id]=mark_id;
 
                     //create a div for the user name to match with the cursor color
-                    DynamicDiv(num,co.name,co.user_id);
+                    DynamicDiv(num,message.name,message.user_id);
                 }
 
                 //remove the cursor for the disconnected user
-                else if(co.act == "remove_cursor"){
+                else if(message.act == "remove_cursor"){
 
                     //get the cursor id from the users list
-                    var markid=users[co.user_id];
+                    var mark_id=users[message.user_id];
 
                     //remove the cursor id from the user list
-                    users[co.user_id]=-1;
+                    users[message.user_id]=-1;
 
                     //remove the cursor from the screen
-                    editor.session.removeMarker(markid);
+                    editor.session.removeMarker(mark_id);
 
                     //remove the div of the user
-                    var oldelement=document.getElementById(co.user_id);
+                    var oldelement=document.getElementById(message.user_id);
                     if (oldelement) {
                         oldelement.parentNode.removeChild(oldelement);
                     }
@@ -270,67 +270,67 @@
                 }
 
                 //move the user's cursor accordingly
-                else if(co.act == 'move_cursor'){
+                else if(message.act == 'move_cursor'){
 
                     //forbid the info send to server before the cursor change is made
                     from_cursor=true;
 
                     //get the cursor id from the users list
-                    var markid=users[co.user_id];
+                    var mark_id=users[message.user_id];
 
                     //remove the cursor from the screen
-                    editor.session.removeMarker(markid);
+                    editor.session.removeMarker(mark_id);
 
                     //build up the range object of the new cursor position
-                    var row= co.row;
-                    var column1= co.column;
+                    var row= message.row;
+                    var column1= message.column;
                     var column2=column1 +1;
                     var myrange=new r(row,column1,row,column2);
 
                     //get the css style num for the user cursor
-                    var num=co.user_id % 200;
+                    var num=message.user_id % 200;
 
                    //add the cursor to the screen
-                    var markid=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
+                    var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
 
                    //record the cursor id in the users list by index to be user id
-                    users[co.user_id]=markid;
+                    users[message.user_id]=mark_id;
 
                    //enable the cursor info send to server
                    from_cursor=false;
                 }
 
                 //make a selection accordingly
-                else if(co.act == 'change_selection'){
+                else if(message.act == 'change_selection'){
 
                    //get the cursor id from the users list
-                    var markid=users[co.user_id];
+                    var mark_id=users[message.user_id];
 
                     //remove the cursor from the screen
-                    editor.session.removeMarker(markid);
+                    editor.session.removeMarker(mark_id);
 
                     //build up the range object of the new selection
-                    var row1= co.start_row;
-                    var row2= co.end_row;
-                    var column1= co.start_column;
-                    var column2=co.end_column;
+                    var row1= message.start_row;
+                    var row2= message.end_row;
+                    var column1= message.start_column;
+                    var column2=message.end_column;
                     var myrange=new r(row1,column1,row2,column2);
 
                    //get the css style num for the user selection
-                    var num=co.user_id % 200;
+                    var num=message.user_id % 200;
 
                    //add the selection to the screen
-                    var markid=editor.session.addMarker(myrange,"user_"+num+" ace_selection","text");
+                    var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_selection","text");
 
                    //record the selection id in the users list by index to be user id
-                    users[co.user_id]=markid;
+                    users[message.user_id]=mark_id;
                 }
 
                 //deal with the message change
                 else {
 
                     //get the cursor position
-                    var c= editor.getCursorPosition();
+                    var cursor= editor.getCursorPosition();
 
                     //forbid the info send to server before the message change is made
                     from_message = true;
@@ -338,19 +338,19 @@
                     //to check if the message change is made before user self's cursor. if is, then the applied change
                     // will affect the user self's cursor position. if not then the change will not affect the user
                     // self's cursor position
-                    if((co.range.start.row< c.row)
-                        || (co.range.end.row< c.row)
-                        || (co.range.start.column< c.column)
-                        ||(co.range.end.column< c.column)){
+                    if((message.range.start.row< cursor.row)
+                        || (message.range.end.row< cursor.row)
+                        || (message.range.start.column< cursor.column)
+                        ||(message.range.end.column< cursor.column)){
 
-                            editor.getSession().getDocument().applyDeltas([co]);
+                            editor.getSession().getDocument().applyDeltas([message]);
                     }
                     else{
 
                         from_cursor=true;
-                        editor.getSession().getDocument().applyDeltas([co]);
+                        editor.getSession().getDocument().applyDeltas([message]);
 
-                        editor.getSelection().moveCursorTo(c.row, c.column,true);
+                        editor.getSelection().moveCursorTo(cursor.row, cursor.column,true);
                         from_cursor=false;
                     }
 
