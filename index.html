@@ -26,64 +26,101 @@
 
 <script>
 
-//    base ace setup
+      //base ace setup
       ace.require("ace/lib/fixoldbrowsers");
-     var editor = ace.edit("editor");
+      //set the div #editor to be ace editor
+      var editor = ace.edit("editor");
+      //set the theme of the ace editor
       editor.setTheme("ace/theme/monokai");
 
 
 
     $(function() {
+      //the connection variable
       var  conn = null;
+
+      //the flag to forbid the info send back to server again before the type in message change is made
       var  from_message = false;
-      var  check1=false;
-      var  check2=false;
+
+      //the flag to forbid the info send back to server again before the text reset is made
       var applychange=false;
+
+      //the flag to forbid the info send back to server again before the cursor move change is made
       var  from_cursor = false;
+
+      //the list to remember the random generated color for different user
       var colorstack=[];
+
+      //define the range to be ace editor range instead of browser default value
       var r=ace.require('ace/range').Range;
+
+      //a list to remember the cursor position of the user by assign the index in the list to be the user's id
       var users=[];
 
 
-//       dinamically distribute color to users
-       $(function() {
+      //dinamically distribute color to users which is randomly generate the user cursor color in the style
+      $(function() {
+
+      //set css to be the first thing of the style
       var css = $('#my_style')[0];
 
+      //rule 1 is to create the color style for user's cursor
       var rule1='';
+
+      //rules is the basic setup style for the ace editor
       var rules = ' #editor {height: 300px; display: block; position:relative;}';
+
+      //rule 2 is to create the color style for user's cursor
       var rule2='';
 
+      //create 200 different color style
       for (var i=0; i < 200; i++){
       var a = 5*Math.floor(Math.random() * 4)
       var b = 5*Math.floor(Math.random() * 4)
       var c = 5*Math.floor(Math.random() * 4)
+
+          //check if the color is black if is reassign it
           while(a==0 && b==0 && c==0){
               a = 5*Math.floor(Math.random() * 4)
               b = 5*Math.floor(Math.random() * 4)
               c = 5*Math.floor(Math.random() * 4)
           }
 
+      //the color style code for user's cursor
       rule1 += 'div.user_' + String(i) + '.ace_cursor { border-left-color: #' + a.toString(16) + b.toString(16) + c.toString(16) + ' }\n'
+
+      //the color style code for user's selection
       rule2 += 'div.ace_marker-layer div.user_' + String(i) + '.ace_selection { background-color: #' + a.toString(16) + b.toString(16) + c.toString(16)+ ' }\n'
-          colorstack[i]='#' + a.toString(16) + b.toString(16) + c.toString(16);
+
+      //record the color to the color stack for dymanicaly create div for new connect user
+      colorstack[i]='#' + a.toString(16) + b.toString(16) + c.toString(16);
        }
 
-          rules=rules+rule1+rule2;
+       //combine all the style code
+       rules=rules+rule1+rule2;
 
-           css.innerHTML = rules;
+       //apply these to css style
+       css.innerHTML = rules;
        });
 
 
-//      dynamically add new div fro the new user
+      //dynamically add new div fro the new user to match the user with cursor color and user name
       function DynamicDiv(num,name,user_id) {
+
+          //the default color set to be gray for user self
           var color="gray";
+
+            //if the user id is not user self check the color stack according to the user id num to get the right color
             if(user_id!=-1){
                 color=colorstack[num];
             }
+
+        //create the div for the user
         var dynDiv = document.createElement("div");
         dynDiv.id = user_id;
         dynDiv.innerHTML = name;
 
+        //setup the css styple for the div
         dynDiv.style.color =color;
         dynDiv.style.height = "20px";
         dynDiv.style.width = "60px";
@@ -92,104 +129,139 @@
       }
 
 
-//      connection function
+      //connection function
       function connect() {
         disconnect();
 
+        //setup the connection host
         conn = new SockJS('http://' + window.location.host + '/chat', "websocket");
 
 
-//        on open create a div for the user self
+        //when user connected, create a div for the user self
         conn.onopen = function() {
             DynamicDiv(-1,"Myself",-1);
         };
 
 
-//         deal with the message get from the server
+        //deal with the message get from the server
         conn.onmessage = function(e) {
-//                console.log(e.data)
+
+               //load the message
                var co = JSON.parse(e.data);
 
-//               setup the clienttext for the new user
+               //setup the client text for the new connected user
                if (co.act == "startup"){
 
-//                  console.log(co.info);
+                    //load the text
                    var n=JSON.parse(co.info);
 
+                    //check if the client text is the same with the user's text
                     if (n!=(editor.getValue())){
 
+                            //forbid the info send to server before the change is applied
                             from_cursor=true;
                             applychange=true;
                             from_message=true;
-                            check1=true;
-                            check2=true;
-//                            editor.setReadOnly(true)
 
+                                 //maybe useful for future: editor.setReadOnly(true)
+
+                            //set the text to be the client text
                             editor.setValue(n);
 
+                            //after the text is resetted clear mouse selection
                             editor.clearSelection();
+
+                            //get the mouse back to the start point
                             editor.getSelection().moveCursorToScreen(0, 0,false);
 
-//                            setTimeout(function(){editor.setReadOnly(false)},800);
+                                //maybe useful for future: setTimeout(function(){editor.setReadOnly(false)},800);
+
+                            //allow the info send to server to apply the new changes
                             from_message=false;
                             from_cursor=false;
                             applychange=false;
 
                     }
                 }
-//               doing the correction for the collison
+                //doing the correction for the collison
                else if (co.act == "correction"){
 
-//                  console.log(co.info);
+                   //load the text
                    var n=JSON.parse(co.info);
 
+                    //check if the client text is the same with the user's text
                     if (n!=(editor.getValue())){
 
+                            //forbid the info send to server before the change is applied
                             from_cursor=true;
                             applychange=true;
                             from_message=true;
-                            check1=true;
-                            check2=true;
-//                            editor.setReadOnly(true);
 
+                                //maybe useful for future: editor.setReadOnly(true);
+
+                            //get the cursor's current position
                             var p=editor.getSelection().getCursor();
 
+                            //reset the text to be the client text
                             editor.setValue(n);
 
+                            //after the text is resetted clear mouse selection
                             editor.clearSelection();
+
+                            //get the mouse back to the original position
                             editor.getSelection().moveCursorToScreen(p.row, p.column,false);
 
-//                            setTimeout(function(){editor.setReadOnly(false)},800);
+                                //maybe useful for future: setTimeout(function(){editor.setReadOnly(false)},800);
+
+                            //allow the info send to server to apply the new changes
                             from_message=false;
                             from_cursor=false;
                             applychange=false;
 
                     }
                 }
-//                update the client text
+                //update the client text
                 else if(co.act == "getValue"){
 
+                   //send the text to the server and add a tag for server to know how to handle it
                    conn.send(JSON.stringify("user_0_client_text"+editor.getValue()));
                 }
-//               create the cursor for the new user
+
+                //create the cursor for the new user
                 else if (co.act == "create_cursor"){
 
+                    //build up the range object of the cursor
                     var row= co.row;
                     var column1= co.column;
                     var column2=column1 +1;
                     var myrange=new r(row,column1,row,column2);
+
+                    //get the css style num for the user
                     var num=co.user_id % 200;
+
+                    //add the cursor to the screen
                     var markid=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
+
+                    //record the cursor id in the users list by index to be user id
                     users[co.user_id]=markid;
+
+                    //create a div for the user name to match with the cursor color
                     DynamicDiv(num,co.name,co.user_id);
                 }
 
-//                remove the cursor for the disconnected user
+                //remove the cursor for the disconnected user
                 else if(co.act == "remove_cursor"){
 
+                    //get the cursor id from the users list
                     var markid=users[co.user_id];
+
+                    //remove the cursor id from the user list
                     users[co.user_id]=-1;
+
+                    //remove the cursor from the screen
                     editor.session.removeMarker(markid);
+
+                    //remove the div of the user
                     var oldelement=document.getElementById(co.user_id);
                     if (oldelement) {
                         oldelement.parentNode.removeChild(oldelement);
@@ -197,44 +269,75 @@
 
                 }
 
-//                   move the user's cursor accordingly
+                //move the user's cursor accordingly
                 else if(co.act == 'move_cursor'){
 
-                   from_cursor=true;
+                    //forbid the info send to server before the cursor change is made
+                    from_cursor=true;
+
+                    //get the cursor id from the users list
                     var markid=users[co.user_id];
+
+                    //remove the cursor from the screen
                     editor.session.removeMarker(markid);
 
+                    //build up the range object of the new cursor position
                     var row= co.row;
                     var column1= co.column;
                     var column2=column1 +1;
                     var myrange=new r(row,column1,row,column2);
+
+                    //get the css style num for the user cursor
                     var num=co.user_id % 200;
+
+                   //add the cursor to the screen
                     var markid=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
+
+                   //record the cursor id in the users list by index to be user id
                     users[co.user_id]=markid;
+
+                   //enable the cursor info send to server
                    from_cursor=false;
                 }
 
-//                  make a selection accordingly
+                //make a selection accordingly
                 else if(co.act == 'change_selection'){
+
+                   //get the cursor id from the users list
                     var markid=users[co.user_id];
+
+                    //remove the cursor from the screen
                     editor.session.removeMarker(markid);
 
+                    //build up the range object of the new selection
                     var row1= co.start_row;
                     var row2= co.end_row;
                     var column1= co.start_column;
                     var column2=co.end_column;
                     var myrange=new r(row1,column1,row2,column2);
+
+                   //get the css style num for the user selection
                     var num=co.user_id % 200;
+
+                   //add the selection to the screen
                     var markid=editor.session.addMarker(myrange,"user_"+num+" ace_selection","text");
+
+                   //record the selection id in the users list by index to be user id
                     users[co.user_id]=markid;
                 }
 
-//                deal with the message change
+                //deal with the message change
                 else {
 
+                    //get the cursor position
                     var c= editor.getCursorPosition();
 
+                    //forbid the info send to server before the message change is made
                     from_message = true;
+
+                    //to check if the message change is made before user self's cursor. if is, then the applied change
+                    // will affect the user self's cursor position. if not then the change will not affect the user
+                    // self's cursor position
                     if((co.range.start.row< c.row)
                         || (co.range.end.row< c.row)
                         || (co.range.start.column< c.column)
@@ -250,17 +353,19 @@
                         editor.getSelection().moveCursorTo(c.row, c.column,true);
                         from_cursor=false;
                     }
+
+                   //enable the message info send to server
                     from_message = false;
                 }
         };
 
-//        when close set the conn to null
+        //when close set the connection to null
         conn.onclose = function() {
             conn = null;
         };
       }
 
-//        disconnect function
+       //disconnect function
       function disconnect() {
         if (conn != null) {
           conn.close();
@@ -268,7 +373,7 @@
         }
       }
 
-//       auto connect when the page refresh
+      //auto connect when the page refresh
       $(function() {
         if (conn == null) {
           connect();
@@ -276,7 +381,7 @@
         return false;
       });
 
-//        send the info to the server when there is a new type in
+        //send the info to the server when there is a new text change detected
        editor.getSession().getDocument().on('change', function(e){
            if(!from_message&&!applychange&&!from_cursor){
                     conn.send(JSON.stringify(e.data )+ '\r\n');
@@ -284,7 +389,9 @@
        });
 
 
-//        send info to the server when there is a cursor change
+       //send info to the server when there is a cursor change.time out function to help to send the right cursor
+       // position and send the range object if the cursor forms a selection. send a cursor position if the user just
+       //moves cursor
        editor.getSelection().on('changeCursor', function() {
             if(!from_cursor&&!applychange){
                 setTimeout(function() {
