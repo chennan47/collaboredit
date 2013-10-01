@@ -15,6 +15,135 @@ Cursor = namedtuple('Cursor', ('row', 'column'))
 
 users = []
 
+#help function to insert a string into certain position of another string
+def insert(original, new, pos):
+    return original[:pos] + new + original[pos:]
+
+
+#the function to take delta object to form or modify the client text verson
+def delta_change_apply(client_text, delta):
+
+    #load the message
+    change=json.loads(delta)
+
+    #load the action of the message
+    action=change['action']
+
+    #load the range of the message
+    range=change['range']
+
+    #load the start aspect of the range object
+    start=range['start']
+
+    #load the end aspect of the range object
+    end=range['end']
+
+    #load the row aspect of the start object
+    start_row=int(start['row'])
+
+    #load the row aspect of the end object
+    end_row=int(end['row'])
+
+    #load the column aspect of the start object
+    start_column=int(start['column'])
+
+    #load the column aspect of the end object
+    end_column=int(end['column'])
+
+    # load the client text and decode it into a string and split it by the newline into a list of string
+    text_to_string=json.JSONDecoder(strict=False).decode(client_text).split('\n')
+
+    # deal with the insertText action
+    if (action=='insertText'):
+
+        #load the typein text
+        type_in=change['text']
+
+        #deal with the text when it is a new line insertion
+        if (type_in=='\n'):
+
+            #get the string where the insertion newline happened
+            change_string=text_to_string[start_row]
+
+            #break the string into two new string according to the column the insertion happens
+            first_part=change_string[:start_column]
+            second_part=change_string[start_column:]
+
+            #replace the old string in the list with the first part
+            text_to_string[start_row]=first_part
+
+            #insert the second part of the string as a new string right after the first part
+            text_to_string.insert(start_row+1,second_part)
+
+        #deal with the text when it is not a newline insertion
+        else:
+
+            #get the string where the insertion happened
+            change_string=text_to_string[start_row]
+
+            #insert the new string into certain position of the old string according to the column and replace the
+            #old one in the list
+            text_to_string[start_row]=insert(change_string,type_in,start_column)
+
+    #deal with remove text action
+    elif (action=='removeText'):
+
+        #load the remove text
+        type_in=change['text']
+
+        #deal with the text when it is a line remove
+        if (type_in=='\n'):
+
+            #get the two string between them the remove line action happened
+            change_string_1=text_to_string[start_row]
+            change_string_2=text_to_string[end_row]
+
+            #combine them into one string to remove the line and replace it with the first old string in the list
+            text_to_string[start_row]=change_string_1+change_string_2
+
+            #remove the second old string in the list
+            text_to_string.pop(end_row)
+
+        #deal with the text when it is a string remove
+        else:
+
+            #get the string where the deletion happened
+            change_string=text_to_string[start_row]
+
+            #remove the substring from the string according to the column position
+            text_to_string[start_row]=change_string[:start_column]+change_string[end_column:]
+
+    #deal with insertline action
+    elif (action=='insertLines'):
+        # load the list of the insertion string
+        type_in=change['lines']
+
+        #use counter as the increament insertion position
+        counter=start_row
+
+        #insert the string in the type_in information
+        for a in type_in:
+            text_to_string.insert(counter,a)
+            counter+=1
+
+    #deal with removeline action
+    elif (action=='removeLines'):
+
+        #a counter to caculate how many rows need to be remove
+        counter=start_row
+
+        #remove the string in between the range of start row and end row
+        while(counter<end_row):
+            text_to_string.pop(start_row)
+            counter+=1
+
+    #recombine the string with the new line symbol
+    new_client_text='\n'.join(text_to_string)
+
+    #return the json form of the client text
+    return json.dumps(new_client_text)
+
+
 # user class definition
 class User(object):
     _cursor = None
@@ -35,6 +164,8 @@ class User(object):
 
         #user's cursor construction
         self.cursor = cursor or Cursor(0, 0)
+
+        #a line to seperate the two connection user info
         print '--'
 
     @property
@@ -72,7 +203,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
     #the set to check if there are more than one user typing during the period
     typing_user_num_check=set()
 
-    client_text=""
+    client_text=json.dumps("\n")
 
     #remember all the created cursor, if a user disconnect it will be remove from this list
     cursor_create=[]
@@ -84,12 +215,11 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
     user_typing_row=[]
 
     #a list of the change because of the time lag between user and server communication after the client text
-    # updatecommand is sent to user
+    # update command is sent to user
     collison_fix_delta=[]
 
-    #the flag if the file need to be reset
-    file_reset=False
 
+    new_client_text=json.dumps('\n')
 
     def on_open(self, info):
 
@@ -148,57 +278,8 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
     def on_message(self, message):
 
-        #update the client text and check if need to reset other user's screen
-        if("user_0_client_text" in message):
-
-            #remove the pattern from the client text
-            m=message.replace("user_0_client_text","")
-
-            #update the client text if necessary
-            if(ChatConnection.client_text!=m):
-                ChatConnection.client_text=m
-
-            #check if there are more than one user and if during the period there are more than one user editing
-            # and whether there are more than one user editing the same line
-            if (len(self.participants)>1and len(self.typing_user_num_check)>1):
-                for index,first in enumerate(self.user_typing_row):
-                    for second in self.user_typing_row[(index+1):]:
-                            if first[0]!=second[0] and first[1]==second[1]:
-                                #if meet the three conditions set the file reset flag to be true
-                                ChatConnection.file_reset=True
-                                break
-                    # when the file reset flag is true break the outside loop
-                    if(ChatConnection.file_reset):
-                        break
-
-            # if the check find the situation meet the three conditions then reset the users' text
-            if(ChatConnection.file_reset):
-
-                #broadcast the latext client text to all users
-                self.broadcast((x for x in self.participants if x != self),
-                           json.dumps({
-                               'act': 'correction',
-                               'info': ChatConnection.client_text
-                           })
-                )
-
-                #broadcast the delta after the client text is updated to the users
-                for a in self.collison_fix_delta:
-
-                    self.broadcast((x for x in self.participants if x == self), a)
-                ChatConnection.file_reset=False
-
-            #clear the user typing row list
-            del self.user_typing_row[:]
-
-            #clear the number of typing user list
-            self.typing_user_num_check.clear()
-
-            #clear the delta after the client text list
-            del self.collison_fix_delta[:]
-
         #deal with the new input from the user
-        elif ("action" in message):
+        if ("action" in message):
 
             #the user to the set of the typing user num list
             self.typing_user_num_check.add(self);
@@ -212,6 +293,12 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             #record the change because of the time lag between user and server communication after the client text
             # updatecommand is sent to user
             self.collison_fix_delta.append(message)
+
+            #update the client text
+            ChatConnection.client_text=delta_change_apply(ChatConnection.client_text,message)
+
+            #cleat the list recording the change after last time client text updated
+            self.client_text_delta.pop()
 
             # load the message to change it from a json string back to an object which is in the form of
             # {"action":"insertText","range":{"start":{"row":0,"column":0},"end":{"row":0,"column":1}},"text":"a"}
@@ -370,18 +457,42 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 #period call to get update the client text
 def poll(c):
 
+    #the flag if the file need to be reset
+    file_reset=False
+
+     #check if there are more than one user and if during the period there are more than one user editing
+     # and whether there are more than one user editing the same line
+    if (len(c._connection.participants)>1and len(c._connection.typing_user_num_check)>1):
+        for index,first in enumerate(c._connection.user_typing_row):
+            for second in c._connection.user_typing_row[(index+1):]:
+                if first[0]!=second[0] and first[1]==second[1]:
+                    #if meet the three conditions set the file reset flag to be true
+                    file_reset=True
+                    break
+            # when the file reset flag is true break the outside loop
+            if(file_reset):
+                break
+
     #clear the list which remember the change before the update client text fired
     # # but the change isn't applied to user0 yet
     del c._connection.collison_fix_delta[:]
 
-    # get new client text from user 0
-    c.broadcast(
-        (x for x in c._connection.participants if x== c._connection.participants[0] ),
-        json.dumps({'act':'getValue',}),
-    )
+    # if the check find the situation meet the three conditions then reset the users' text
+    if(file_reset):
+        #broadcast the latext client text to all users
+        c.broadcast(c._connection.participants,
+                json.dumps({
+                    'act': 'correction',
+                    'info': c._connection.client_text
+                })
+        )
+        for y in c._connection.collison_fix_delta:
+             c.broadcast(c._connection.participants,y)
+        file_reset=False
 
-    #cleat the list recording the change after last time client text updated
-    del c._connection.client_text_delta[:]
+    #clear the list which remember the change before the update client text fired
+    # # but the change isn't applied to user0 yet
+    del c._connection.collison_fix_delta[:]
 
 
 if __name__ == "__main__":
