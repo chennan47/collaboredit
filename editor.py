@@ -464,6 +464,9 @@ def poll(c):
             if(file_reset):
                 break
 
+    #clear the period typing user check list
+    del c._connection.typing_user_num_check[:]
+
     #clear the list which remember the change before the update client text fired
     # # but the change isn't applied to user0 yet
     del c._connection.collison_fix_delta[:]
