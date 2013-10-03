@@ -4,7 +4,7 @@
   <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
   <script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
   <script src="http://ajax.cdnjs.com/ajax/libs/json2/20110223/json2.js"></script>
-
+  <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
 
 </head>
 <body>
@@ -57,6 +57,8 @@
       //a list to remember the cursor position of the user by assign the index in the list to be the user's id
       var users=[];
 
+      //a list of username tag which show up on the user's cursor
+      var cursor_tag=[];
 
       //dinamically distribute color to users which is randomly generate the user cursor color in the style
       $(function() {
@@ -68,10 +70,12 @@
       var rule1='';
 
       //rules is the basic setup style for the ace editor
-      var rules = ' #editor {height: 300px; display: block; position:relative;}';
+      var rules = ' #editor{height: 300px; display: block; position:relative;}\n';
+      var hover = '.ace_start{pointer-events: auto}\n';
 
       //rule 2 is to create the color style for user's cursor
       var rule2='';
+      rules=rules+hover;
 
       //create 200 different color style
       for (var i=0; i < 200; i++){
@@ -86,14 +90,24 @@
               c = 5*Math.floor(Math.random() * 4)
           }
 
+          //check if the color is similar to the previous one
+          while(i!=0 && ('#' + a.toString(16) + b.toString(16) + c.toString(16))==colorstack[i-1]){
+                   a = 5*Math.floor(Math.random() * 4)
+                   b = 5*Math.floor(Math.random() * 4)
+                   c = 5*Math.floor(Math.random() * 4)
+          }
+
+
+      //record the color to the color stack for dymanicaly create div for new connect user
+      colorstack[i]='#' + a.toString(16) + b.toString(16) + c.toString(16);
+
       //the color style code for user's cursor
       rule1 += 'div.user_' + String(i) + '.ace_cursor { border-left-color: #' + a.toString(16) + b.toString(16) + c.toString(16) + ' }\n'
 
       //the color style code for user's selection
       rule2 += 'div.ace_marker-layer div.user_' + String(i) + '.ace_selection { background-color: #' + a.toString(16) + b.toString(16) + c.toString(16)+ ' }\n'
 
-      //record the color to the color stack for dymanicaly create div for new connect user
-      colorstack[i]='#' + a.toString(16) + b.toString(16) + c.toString(16);
+
        }
 
        //combine all the style code
@@ -102,6 +116,38 @@
        //apply these to css style
        css.innerHTML = rules;
        });
+
+      function cursor_username(num,name,user_id,label) {
+
+          //the default color set to be gray for user self
+          var color="gray";
+
+            //if the user id is not user self check the color stack according to the user id num to get the right color
+            if(user_id!=-1){
+                color=colorstack[num];
+            }
+
+        //create the div for the username on cursor tag
+        var cursor_username = document.createElement("div");
+        cursor_username.id = user_id;
+        cursor_username.innerHTML = name;
+
+        //setup the css styple for the div
+        cursor_username.style.color ="black";
+        cursor_username.style.height = "13px";
+        cursor_username.style.width = "40px";
+        cursor_username.style.backgroundColor = color;
+        cursor_username.style.position="absolute";
+        cursor_username.style.top="13px";
+
+        //add the div to the page
+        var wrapper=document.getElementsByClassName(label)[0];
+        wrapper.appendChild(cursor_username);
+
+        //record the div in the cursor tag
+        cursor_tag[user_id]=cursor_username;
+
+      }
 
 
       //dynamically add new div fro the new user to match the user with cursor color and user name
@@ -117,7 +163,7 @@
 
         //create the div for the user
         var dynDiv = document.createElement("div");
-        dynDiv.id = user_id;
+        dynDiv.id = "name"+user_id;
         dynDiv.innerHTML = name;
 
         //setup the css styple for the div
@@ -125,6 +171,8 @@
         dynDiv.style.height = "20px";
         dynDiv.style.width = "60px";
         dynDiv.style.backgroundColor = 'black';
+
+        //add the div to the page
         document.body.appendChild(dynDiv);
       }
 
@@ -242,11 +290,30 @@
                     //add the cursor to the screen
                     var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
 
+                    //add the username tag on cursor and make it fade after 3 secs
+                    setTimeout(function() {
+                        cursor_username(num,message.name,message.user_id,"user_"+num);
+                        $("#"+num).fadeOut(3000);
+                    },50);
+
+                   //check if the username tag is dropped when there is a repaint of the board if it is then
+                   //readded it
+                   setTimeout(function() {
+                      for(var i=0;i<users.length;i++){
+                            if(users[i]!=null&&users[i]!=-1&& $("#"+i).length==0){
+                                var num=i%200;
+                                document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
+                            }
+                       }
+                   },100);
+
                     //record the cursor id in the users list by index to be user id
                     users[message.user_id]=mark_id;
 
+
                     //create a div for the user name to match with the cursor color
                     DynamicDiv(num,message.name,message.user_id);
+
                 }
 
                 //remove the cursor for the disconnected user
@@ -262,7 +329,7 @@
                     editor.session.removeMarker(mark_id);
 
                     //remove the div of the user
-                    var oldelement=document.getElementById(message.user_id);
+                    var oldelement=document.getElementById("name"+message.user_id);
                     if (oldelement) {
                         oldelement.parentNode.removeChild(oldelement);
                     }
@@ -272,14 +339,31 @@
                 //move the user's cursor accordingly
                 else if(message.act == 'move_cursor'){
 
+                   //get the css style num for the user cursor
+                    var num=message.user_id % 200;
+
+                    //remove the old username-cursor tag's div
+                    var oldelement=document.getElementById(message.user_id);
+                    if (oldelement) {
+                        oldelement.parentNode.removeChild(oldelement);
+                    }
+
                     //forbid the info send to server before the cursor change is made
                     from_cursor=true;
 
-                    //get the cursor id from the users list
-                    var mark_id=users[message.user_id];
+                    //check if the user's cursor is in the list if it is remove the old one if not create a new
+                    //user div to match the cursor color and username for the user
+                    if(users[message.user_id]!=null && users[message.user_id]!=-1){
+                        //get the cursor id from the users list
+                        var mark_id=users[message.user_id];
 
-                    //remove the cursor from the screen
-                    editor.session.removeMarker(mark_id);
+                        //remove the cursor from the screen
+                        editor.session.removeMarker(mark_id);
+                    }
+                    else{
+                        DynamicDiv(num,message.name,message.user_id);
+                    }
+
 
                     //build up the range object of the new cursor position
                     var row= message.row;
@@ -287,14 +371,28 @@
                     var column2=column1 +1;
                     var myrange=new r(row,column1,row,column2);
 
-                    //get the css style num for the user cursor
-                    var num=message.user_id % 200;
-
                    //add the cursor to the screen
                     var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
 
                    //record the cursor id in the users list by index to be user id
                     users[message.user_id]=mark_id;
+
+                   //add the username tag on cursor and make it fade after 3 secs
+                   setTimeout(function() {
+                       cursor_username(num,message.name,message.user_id,"user_"+num);
+                       $("#"+num).fadeOut(3000);
+                   },50);
+
+                   //check if the username tag is dropped when there is a repaint of the board if it is then
+                   //readded it
+                   setTimeout(function() {
+                      for(var i=0;i<users.length;i++){
+                            if(users[i]!=null&&users[i]!=-1&& $("#"+i).length==0){
+                                var num=i%200;
+                                document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
+                            }
+                       }
+                   },100);
 
                    //enable the cursor info send to server
                    from_cursor=false;
@@ -303,11 +401,28 @@
                 //make a selection accordingly
                 else if(message.act == 'change_selection'){
 
-                   //get the cursor id from the users list
-                    var mark_id=users[message.user_id];
+                    //get the css style num for the user selection
+                    var num=message.user_id % 200;
 
-                    //remove the cursor from the screen
-                    editor.session.removeMarker(mark_id);
+                    //remove the old username-cursor tag's div
+                    var oldelement=document.getElementById(message.user_id);
+                    if (oldelement) {
+                        oldelement.parentNode.removeChild(oldelement);
+                    }
+
+                    //check if the user's cursor is in the list if it is remove the old one if not create a new
+                    //user div to match the cursor color and username for the user
+                    if(users[message.user_id]!=null && users[message.user_id]!=-1){
+                        //get the cursor id from the users list
+                        var mark_id=users[message.user_id];
+
+                        //remove the cursor from the screen
+                        editor.session.removeMarker(mark_id);
+                    }
+                    else{
+                        DynamicDiv(num,message.name,message.user_id);
+                    }
+
 
                     //build up the range object of the new selection
                     var row1= message.start_row;
@@ -316,11 +431,29 @@
                     var column2=message.end_column;
                     var myrange=new r(row1,column1,row2,column2);
 
-                   //get the css style num for the user selection
-                    var num=message.user_id % 200;
+
 
                    //add the selection to the screen
                     var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_selection","text");
+
+                   //add the username tag on cursor and make it fade after 3 secs
+                   setTimeout(function() {
+                       cursor_username(num,message.name,message.user_id,"user_"+num);
+                       $("#"+num).fadeOut(3000);
+
+
+                   },50);
+
+                   //check if the username tag is dropped when there is a repaint of the board if it is then
+                   //readded it
+                   setTimeout(function() {
+                      for(var i=0;i<users.length;i++){
+                            if(users[i]!=null&&users[i]!=-1&& $("#"+i).length==0){
+                                var num=i%200;
+                                document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
+                            }
+                       }
+                   },100);
 
                    //record the selection id in the users list by index to be user id
                     users[message.user_id]=mark_id;
@@ -381,11 +514,37 @@
         return false;
       });
 
+        //mouseover function to show the hidden username tag on the cursor, when mouseout the tag fade in 3 secs
+        setTimeout(function(){
+        $(".ace_start").on('mouseover',function() {
+                var child=$(this).children();
+                    child.fadeIn(100);
+                }
+         );
+
+        $(".ace_start").on('mouseout',function() {
+                var child=$(this).children();
+                    child.fadeOut(3000);
+                }
+         );
+        },500);
+
+        //check if the username tag is dropped when there is a repaint of the board if it is then
+        //readded it
+       $( "#editor" ).click(function() {
+            for(var i=0;i<users.length;i++){
+                if(users[i]!=null&&users[i]!=-1&& $("#"+i).length==0){
+                    var num=i%200;
+                    document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
+                }
+            }
+       });
+
         //send the info to the server when there is a new text change detected
        editor.getSession().getDocument().on('change', function(e){
            if(!from_message&&!applychange&&!from_cursor){
                     conn.send(JSON.stringify(e.data )+ '\r\n');
-            }
+           }
        });
 
 
@@ -402,8 +561,17 @@
                         conn.send(JSON.stringify(editor.getSelection().getRange())+ '\r\n');
                     }
                 },1)
-            };
 
+
+                setTimeout(function() {
+                    for(var i=0;i<users.length;i++){
+                        if (users[i]!=-1 && users[i]!=null){
+                            var num=i%200;
+                            document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
+                        }
+                    }
+                },300)
+            };
         });
 
     });
