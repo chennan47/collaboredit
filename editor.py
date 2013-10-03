@@ -216,7 +216,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
     #a list of the change because of the time lag between user and server communication after the client text
     # update command is sent to user
     collison_fix_delta=[]
-    
+
 
     def on_open(self, info):
 
