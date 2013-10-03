@@ -205,9 +205,6 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
     client_text=json.dumps("\n")
 
-    #remember all the created cursor, if a user disconnect it will be remove from this list
-    cursor_create=[]
-
     #remember all the cursors latest action
     cursor_position=[]
 
@@ -261,18 +258,13 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
             self.broadcast((x for x in self.participants if x == self), a)
 
-        # setup all users' cursor to the new user
-        for a in self.cursor_create:
-
-            self.broadcast((x for x in self.participants if x == self), a[1])
-
         # update all users' lastest cursor position to the new user
         for a in self.cursor_position:
 
             self.broadcast((x for x in self.participants if x == self), a[1])
 
         # add the new user's cursor to the cursor list
-        self.cursor_create.append((self.users[index].id,constructor))
+        self.cursor_position.append((self.users[index].id,constructor))
 
 
 
@@ -355,6 +347,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             #the change selection command formed
             constructor=json.dumps({
                     'act': 'change_selection',
+                    'name': self.users[self.participants.index(self)].username,
                     'user_id': self.users[self.participants.index(self)].id,
                     'start_row': start['row'],
                     'start_column': start['column'],
@@ -393,6 +386,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             #form the command of cursor moving
             constructor=json.dumps({
                     'act': 'move_cursor',
+                    'name': self.users[self.participants.index(self)].username,
                     'user_id': self.users[self.participants.index(self)].id,
                     'row': cursor['row'],
                     'column': cursor['column'],
@@ -433,13 +427,6 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             (x for x in self.participants if x != self),
             constructor,
         )
-
-        #delete the user's cursor from the created cursor list
-        for x in self.cursor_create:
-
-                if (x[0]==self.users[self.participants.index(self)].id):
-
-                    self.cursor_create.remove(x)
 
         #delete the user's cursor from the cursor position list
         for x in self.cursor_position:
