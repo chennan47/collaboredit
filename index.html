@@ -7,7 +7,7 @@
   <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
 
 </head>
-<body>
+<body onload="checkCookie()">
 <h3>Collaborative Editor!</h3>
 
 <style id='my_style' type="text/css" media="screen">
@@ -26,6 +26,65 @@
 
 <script>
 
+      //create a cookie to send the username to server
+      function setCookie(c_name,value,exdays){
+            var exdate=new Date();
+            exdate.setDate(exdate.getDate() + exdays);
+            var c_value=encodeURI(value) + ((exdays==null) ? "" : "; expires="+exdate.toUTCString());
+            document.cookie=c_name + "=" + c_value;
+      }
+
+        //another create cookie method, maybe useful later
+//      function createCookie(name,value,days) {
+//          if (days) {
+//            var date = new Date();
+//            date.setTime(date.getTime()+(days*24*60*60*1000));
+//            var expires = "; expires="+date.toGMTString();
+//          }
+//          else var expires = "";
+//          document.cookie = name+"="+value+expires+"; path=/";
+//      }
+
+      //get the cookie from the browser
+      function getCookie(c_name){
+            var c_value = document.cookie;
+            var c_start = c_value.indexOf(" " + c_name + "=");
+            if (c_start == -1){
+                c_start = c_value.indexOf(c_name + "=");
+            }
+            if (c_start == -1){
+                 c_value = null;
+            }else{
+                 c_start = c_value.indexOf("=", c_start) + 1;
+                 var c_end = c_value.indexOf(";", c_start);
+                 if (c_end == -1){
+                    c_end = c_value.length;
+                 }
+                 c_value = decodeURI((c_value.substring(c_start,c_end)));
+            }
+            return c_value;
+            }
+
+        //method to erasecooke maybe useful for later
+//      function eraseCookie(name) {
+//            createCookie(name,"",-1);
+//      }
+
+    //check the cookie if the user's name is already in the list
+    function checkCookie(){
+        var username=getCookie("username");
+        if (username!=null && username!=""){
+
+        }
+        else{
+            username=prompt("Please enter your name:","");
+            if (username!=null && username!=""){
+//                console.log(username);
+                setCookie("username",username,1);
+            }
+        }
+     }
+
       //base ace setup
       ace.require("ace/lib/fixoldbrowsers");
       //set the div #editor to be ace editor
@@ -34,8 +93,8 @@
       editor.setTheme("ace/theme/monokai");
 
 
-
     $(function() {
+
       //the connection variable
       var  conn = null;
 
@@ -72,10 +131,11 @@
       //rules is the basic setup style for the ace editor
       var rules = ' #editor{height: 300px; display: block; position:relative;}\n';
       var hover = '.ace_start{pointer-events: auto}\n';
+      rules=rules+hover;
 
       //rule 2 is to create the color style for user's cursor
       var rule2='';
-      rules=rules+hover;
+
 
       //create 200 different color style
       for (var i=0; i < 200; i++){
@@ -169,7 +229,7 @@
         //setup the css styple for the div
         dynDiv.style.color =color;
         dynDiv.style.height = "20px";
-        dynDiv.style.width = "60px";
+        dynDiv.style.width = "200px";
         dynDiv.style.backgroundColor = 'black';
 
         //add the div to the page

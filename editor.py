@@ -10,6 +10,7 @@ from collections import namedtuple
 import time
 import json
 from uuid import uuid4
+import urllib
 
 Cursor = namedtuple('Cursor', ('row', 'column'))
 
@@ -183,6 +184,7 @@ class User(object):
 class IndexHandler(tornado.web.RequestHandler):
     """Regular HTTP handler to serve the chatroom page"""
     def get(self):
+
         self.render('index.html')
 
 
@@ -220,11 +222,15 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
     def on_open(self, info):
 
+        #get the username from the user
+        cookie_name=str(info.cookies).replace("Set-Cookie: username=","",1)
+        cookie_name=urllib.unquote(cookie_name).decode('utf8')
+        
         # Add client to the clients list
         self.participants.append(self)
 
         # Create user and add it to the user list
-        self.users.append(User())
+        self.users.append(User(name=cookie_name))
 
         #current user's index in the list
         index=len(users)-1
