@@ -216,16 +216,14 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
     #a list of the change because of the time lag between user and server communication after the client text
     # update command is sent to user
     collison_fix_delta=[]
-
-
-    new_client_text=json.dumps('\n')
+    
 
     def on_open(self, info):
 
         #get the username from the user
         cookie_name=str(info.cookies).replace("Set-Cookie: username=","",1)
         cookie_name=urllib.unquote(cookie_name).decode('utf8')
-        
+
         # Add client to the clients list
         self.participants.append(self)
 
