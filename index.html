@@ -119,6 +119,11 @@
 
     //the mouseover event function
      function mouseOver(){
+
+         $(".ace_start").unbind('mouseover');
+
+        $(".ace_start").unbind('mouseout');
+
         $(".ace_start").on('mouseover',function() {
 
                 var child=$(this).children();
