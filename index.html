@@ -133,7 +133,7 @@
 
         $(".ace_start").on('mouseout',function() {
                 var child=$(this).children();
-                    child.fadeOut(3000);
+                    child.fadeOut(2000);
                 }
          );
      }
@@ -364,7 +364,7 @@
           setTimeout(function() {
               cursor_username(num,message.name,message.user_id,"user_"+num);
               $("#"+num).fadeIn(100);
-              $("#"+num).fadeOut(3000);
+              $("#"+num).fadeOut(2000);
           },50);
 
            //check if the username tag is dropped when there is a repaint of the board if it is thenreadded it
