@@ -117,25 +117,82 @@
       //set the theme of the ace editor
       editor.setTheme("ace/theme/monokai");
 
+        //cycler function to deal with mouseover
+        cycler1 = function(e) {
+            $(e.target).children().data('is_waiting', true)
+
+            // get time since the last click
+            var time_since_change = new Date() - $(e.target).children().data('last_moved');
+
+            if( time_since_change>= 3000 ){
+
+                $(e.target).children().fadeOut(1);
+
+                $(e.target).children().data('is_waiting', false);
+
+            } else {
+                setTimeout(function() { cycler1(e) }, 200);
+            }
+        }
+
+        //function to record the last mouse move
+        mouseMove = function(e) {
+            // Record the time of the click
+            $(e.target).children().data('last_moved', new Date());
+
+            // Start Cycler
+            if( !$(e.target).children().data('is_waiting') ){
+
+                cycler1(e);
+            }
+        }
+
+        //cycler function for screenchange
+        function cycler2(object) {
+
+            $(object).data('is_waiting', true)
+
+            // get time since the last click
+            var time_since_change = new Date() - $(object).data('last_moved');
+
+            if( time_since_change>= 3000 ){
+                $(object).fadeOut(1);
+
+                $(object).data('is_waiting', false);
+
+            } else {
+                setTimeout(function() { cycler2(object) }, 200);
+            }
+        }
+
+        //function to deal with screen change time record
+        function screenChange(object) {
+
+            // Record the time of the screenchanged
+            $(object).data('last_moved', new Date());
+
+            // Start Cycler
+            if( !$(object).data('is_waiting') ){
+
+                cycler2(object);
+            }
+        }
+
     //the mouseover event function
      function mouseOver(){
 
-         $(".ace_start").unbind('mouseover');
+        $(".ace_start").unbind('mouseover');
 
         $(".ace_start").unbind('mouseout');
 
         $(".ace_start").on('mouseover',function() {
 
                 var child=$(this).children();
-                    child.fadeIn(100);
-                }
-         );
+                    child.fadeIn(50);
+        });
 
-        $(".ace_start").on('mouseout',function() {
-                var child=$(this).children();
-                    child.fadeOut(2000);
-                }
-         );
+        $(".ace_start").on('mouseout',mouseMove);
+
      }
 
      //check if username tag is there when repainted
@@ -175,6 +232,17 @@
       //a list of username tag which show up on the user's cursor
       var cursor_tag=[];
 
+      //helper function to build up range object
+      function createRange(pos1,pos2,pos3,pos4){
+          //build up the range object of the new cursor position
+          var row1= pos1;
+          var column1= pos2;
+          var row2= pos3;
+          var column2=pos4;
+          var my_range=new r(pos1,pos2,pos3,pos4);
+          return my_range;
+      }
+
       //helper function to set or reset text
       function setText(string_message,pos1,pos2){
            //forbid the info send to server before the change is applied
@@ -201,24 +269,6 @@
           applychange=false;
       }
 
-
-      //helper function to check if the user's cursor is in the list if it is remove the old one if not create a new
-      //user div to match the cursor color and username for the user
-      function cursorRemove(users,message,num){
-          if(users[message.user_id]!=null && users[message.user_id]!=-1){
-              //get the cursor id from the users list
-              var mark_id=users[message.user_id];
-
-              //remove the cursor from the screen
-              editor.session.removeMarker(mark_id);
-
-          }else{
-
-              //create a new user div to match the cursor color and username for the user
-              DynamicDiv(num,message.name,message.user_id);
-          }
-      }
-
       //helper function to remove a div
       function divRemove(id_num){
           //remove the old username-cursor tag's div
@@ -230,14 +280,14 @@
 
       //helper function to create a new cursor
       function createMarker(users,message,num){
+
           //build up the range object of the new cursor position
-          var row= message.row;
-          var column1= message.column;
-          var column2=column1 +1;
-          var myrange=new r(row,column1,row,column2);
+          var my_range=createRange(message.row,message.column,message.row,message.column+1);
 
           //add the cursor to the screen
-          var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
+          var mark_id=editor.session.addMarker(my_range,"user_"+num+" ace_cursor","text");
+
+          editor.session.addDynamicMarker(editor.session.getMarkers()[mark_id],false);
 
           //record the cursor id in the users list by index to be user id
           users[message.user_id]=mark_id;
@@ -363,8 +413,7 @@
           //add the username tag on cursor and make it fade after 3 secs
           setTimeout(function() {
               cursor_username(num,message.name,message.user_id,"user_"+num);
-              $("#"+num).fadeIn(100);
-              $("#"+num).fadeOut(2000);
+              $("#"+num).fadeIn(100,screenChange("#"+num));
           },50);
 
            //check if the username tag is dropped when there is a repaint of the board if it is thenreadded it
@@ -377,6 +426,7 @@
               mouseOver();
            },150);
       }
+
       //connection function
       function connect() {
         disconnect();
@@ -481,10 +531,28 @@
 
                     //check if the user's cursor is in the list if it is remove the old one if not create a new
                     //user div to match the cursor color and username for the user
-                    cursorRemove(users,message,num);
+                    if(users[message.user_id]!=null && users[message.user_id]!=-1){
+                        //get the cursor id from the users list
+                        var mark_id=users[message.user_id];
 
-                   //add the cursor to the screen
-                    createMarker(users,message,num);
+                        //build up the range object of the new cursor position
+                        var my_range=createRange(message.row,message.column,message.row,message.column+1);
+
+                         //update the marker
+                        editor.session.getMarkers()[mark_id].range=my_range;
+                        if(editor.session.getMarkers()[mark_id].clazz!="user_"+num+" ace_cursor"){
+                            editor.session.getMarkers()[mark_id].clazz="user_"+num+" ace_cursor";
+                        }
+                        editor.updateSelectionMarkers();
+
+                    }else{
+
+                        //create a new user div to match the cursor color and username for the user
+                        DynamicDiv(num,message.name,message.user_id);
+
+                        //add the cursor to the screen
+                        createMarker(users,message,num);
+                    }
 
                    //add the username tag on cursor and make it fade after 3 secs
                    tagMove(users,cursor_tag,message,num);
@@ -504,21 +572,38 @@
 
                     //check if the user's cursor is in the list if it is remove the old one if not create a new
                     //user div to match the cursor color and username for the user
-                    cursorRemove(users,message,num);
+                    if(users[message.user_id]!=null && users[message.user_id]!=-1){
+                        //get the cursor id from the users list
+                        var mark_id=users[message.user_id];
 
+                       //build up the range object of the new selection
+                       var my_range=createRange(message.start_row,message.start_column,message.end_row,message.end_column);
 
-                    //build up the range object of the new selection
-                    var row1= message.start_row;
-                    var row2= message.end_row;
-                    var column1= message.start_column;
-                    var column2=message.end_column;
-                    var myrange=new r(row1,column1,row2,column2);
+                       //update the marker
+                       editor.session.getMarkers()[mark_id].range=my_range;
 
-                    //add the selection to the screen
-                    var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_selection","text");
+                       if(editor.session.getMarkers()[mark_id].clazz!="user_"+num+" ace_selection"){
+                            editor.session.getMarkers()[mark_id].clazz="user_"+num+" ace_selection";
+                       }
 
-                    //record the cursor id in the users list by index to be user id
-                    users[message.user_id]=mark_id;
+                       editor.updateSelectionMarkers();
+
+                    }else{
+
+                        //create a new user div to match the cursor color and username for the user
+                        DynamicDiv(num,message.name,message.user_id);
+
+                        //build up the range object of the new selection
+                        var my_range=createRange(message.start_row,message.start_column,message.end_row,message.end_column);
+
+                        //add the selection to the screen
+                        var mark_id=editor.session.addMarker(my_range,"user_"+num+" ace_selection","text");
+                        editor.session.addDynamicMarker(editor.session.getMarkers()[mark_id],false);
+
+                        //record the cursor id in the users list by index to be user id
+                        users[message.user_id]=mark_id;
+
+                    }
 
                     //add the username tag on cursor and make it fade after 3 secs
                     tagMove(users,cursor_tag,message,num);
