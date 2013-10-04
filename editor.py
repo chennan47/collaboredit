@@ -465,7 +465,7 @@ def poll(c):
                 break
 
     #clear the period typing user check list
-    del c._connection.typing_user_num_check[:]
+    c._connection.typing_user_num_check.clear()
 
     #clear the list which remember the change before the update client text fired
     # # but the change isn't applied to user0 yet
