@@ -6,9 +6,32 @@
   <script src="http://ajax.cdnjs.com/ajax/libs/json2/20110223/json2.js"></script>
   <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
 
+
+
 </head>
-<body>
+<body onload="checkCookie()">
 <h3>Collaborative Editor!</h3>
+
+<style id='default_style' type="text/css" media="screen">
+ .ace_marker-layer{
+     z-index:initial;
+ }
+ .ace_active-line{
+     z-index:1;
+ }
+
+ .ace_text-layer{
+     z-index:5;
+ }
+ .ace_cursor{
+     z-index:6;
+     pointer-events: auto;
+ }
+ div.ace_selection{
+     /*z-index:auto;*/
+     pointer-events: auto;
+ }
+</style>
 
 <style id='my_style' type="text/css" media="screen">
   div.user_1.ace_cursor {
@@ -26,16 +49,165 @@
 
 <script>
 
+      //create a cookie to send the username to server
+      function setCookie(c_name,value,exdays){
+            var exdate=new Date();
+            exdate.setDate(exdate.getDate() + exdays);
+            var c_value=encodeURI(value) + ((exdays==null) ? "" : "; expires="+exdate.toUTCString());
+            document.cookie=c_name + "=" + c_value;
+      }
+
+        //another create cookie method, maybe useful later
+//      function createCookie(name,value,days) {
+//          if (days) {
+//            var date = new Date();
+//            date.setTime(date.getTime()+(days*24*60*60*1000));
+//            var expires = "; expires="+date.toGMTString();
+//          }
+//          else var expires = "";
+//          document.cookie = name+"="+value+expires+"; path=/";
+//      }
+
+      //get the cookie from the browser
+      function getCookie(c_name){
+            var c_value = document.cookie;
+            var c_start = c_value.indexOf(" " + c_name + "=");
+            if (c_start == -1){
+                c_start = c_value.indexOf(c_name + "=");
+            }
+            if (c_start == -1){
+                 c_value = null;
+            }else{
+                 c_start = c_value.indexOf("=", c_start) + 1;
+                 var c_end = c_value.indexOf(";", c_start);
+                 if (c_end == -1){
+                    c_end = c_value.length;
+                 }
+                 c_value = decodeURI((c_value.substring(c_start,c_end)));
+            }
+            return c_value;
+            }
+
+        //method to erasecooke maybe useful for later
+//      function eraseCookie(name) {
+//            createCookie(name,"",-1);
+//      }
+
+    //check the cookie if the user's name is already in the list
+    function checkCookie(){
+        var username=getCookie("username");
+        if (username!=null && username!=""){
+
+        }
+        else{
+            username=prompt("Please enter your name:","");
+            if (username!=null && username!=""){
+//                console.log(username);
+                setCookie("username",username,1);
+            }
+        }
+     }
+
       //base ace setup
       ace.require("ace/lib/fixoldbrowsers");
+
       //set the div #editor to be ace editor
       var editor = ace.edit("editor");
+
       //set the theme of the ace editor
       editor.setTheme("ace/theme/monokai");
 
+        //cycler function to deal with mouseover
+        cycler1 = function(e) {
+            $(e.target).children().data('is_waiting', true)
+
+            // get time since the last click
+            var time_since_change = new Date() - $(e.target).children().data('last_moved');
+
+            if( time_since_change>= 3000 ){
+
+                $(e.target).children().fadeOut(1);
+
+                $(e.target).children().data('is_waiting', false);
+
+            } else {
+                setTimeout(function() { cycler1(e) }, 200);
+            }
+        }
+
+        //function to record the last mouse move
+        mouseMove = function(e) {
+            // Record the time of the click
+            $(e.target).children().data('last_moved', new Date());
+
+            // Start Cycler
+            if( !$(e.target).children().data('is_waiting') ){
+
+                cycler1(e);
+            }
+        }
+
+        //cycler function for screenchange
+        function cycler2(object) {
+
+            $(object).data('is_waiting', true)
+
+            // get time since the last click
+            var time_since_change = new Date() - $(object).data('last_moved');
+
+            if( time_since_change>= 3000 ){
+                $(object).fadeOut(1);
+
+                $(object).data('is_waiting', false);
+
+            } else {
+                setTimeout(function() { cycler2(object) }, 200);
+            }
+        }
+
+        //function to deal with screen change time record
+        function screenChange(object) {
+
+            // Record the time of the screenchanged
+            $(object).data('last_moved', new Date());
+
+            // Start Cycler
+            if( !$(object).data('is_waiting') ){
+
+                cycler2(object);
+            }
+        }
+
+    //the mouseover event function
+     function mouseOver(){
+
+        $(".ace_start").unbind('mouseover');
+
+        $(".ace_start").unbind('mouseout');
+
+        $(".ace_start").on('mouseover',function() {
+
+                var child=$(this).children();
+                    child.fadeIn(50);
+        });
+
+        $(".ace_start").on('mouseout',mouseMove);
+
+     }
+
+     //check if username tag is there when repainted
+     function tagCheck(users,cursor_tag){
+        for(var i=0;i<users.length;i++){
+                            if(users[i]!=null&&users[i]!=-1&& $("#"+i).length==0){
+                                var num=i%200;
+                                document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
+                            }
+         }
+     }
 
 
     $(function() {
+
       //the connection variable
       var  conn = null;
 
@@ -60,6 +232,68 @@
       //a list of username tag which show up on the user's cursor
       var cursor_tag=[];
 
+      //helper function to build up range object
+      function createRange(pos1,pos2,pos3,pos4){
+          //build up the range object of the new cursor position
+          var row1= pos1;
+          var column1= pos2;
+          var row2= pos3;
+          var column2=pos4;
+          var my_range=new r(pos1,pos2,pos3,pos4);
+          return my_range;
+      }
+
+      //helper function to set or reset text
+      function setText(string_message,pos1,pos2){
+           //forbid the info send to server before the change is applied
+          from_cursor=true;
+          applychange=true;
+          from_message=true;
+
+              //maybe useful for future: editor.setReadOnly(true)
+
+          //set the text to be the client text
+          editor.setValue(string_message);
+
+          //after the text is resetted clear mouse selection
+          editor.clearSelection();
+
+          //get the mouse back to the start point
+          editor.getSelection().moveCursorToScreen(pos1, pos2,false);
+
+              //maybe useful for future: setTimeout(function(){editor.setReadOnly(false)},800);
+
+          //allow the info send to server to apply the new changes
+          from_message=false;
+          from_cursor=false;
+          applychange=false;
+      }
+
+      //helper function to remove a div
+      function divRemove(id_num){
+          //remove the old username-cursor tag's div
+          var oldelement=document.getElementById(id_num);
+          if (oldelement) {
+              oldelement.parentNode.removeChild(oldelement);
+          }
+      }
+
+      //helper function to create a new cursor
+      function createMarker(users,message,num){
+
+          //build up the range object of the new cursor position
+          var my_range=createRange(message.row,message.column,message.row,message.column+1);
+
+          //add the cursor to the screen
+          var mark_id=editor.session.addMarker(my_range,"user_"+num+" ace_cursor","text");
+
+          editor.session.addDynamicMarker(editor.session.getMarkers()[mark_id],false);
+
+          //record the cursor id in the users list by index to be user id
+          users[message.user_id]=mark_id;
+      }
+
+
       //dinamically distribute color to users which is randomly generate the user cursor color in the style
       $(function() {
 
@@ -71,11 +305,12 @@
 
       //rules is the basic setup style for the ace editor
       var rules = ' #editor{height: 300px; display: block; position:relative;}\n';
-      var hover = '.ace_start{pointer-events: auto}\n';
+//      var hover = '.ace_start{pointer-events: auto}\n';
+//      rules=rules+hover;
 
       //rule 2 is to create the color style for user's cursor
       var rule2='';
-      rules=rules+hover;
+
 
       //create 200 different color style
       for (var i=0; i < 200; i++){
@@ -84,14 +319,8 @@
       var c = 5*Math.floor(Math.random() * 4)
 
           //check if the color is black if is reassign it
-          while(a==0 && b==0 && c==0){
-              a = 5*Math.floor(Math.random() * 4)
-              b = 5*Math.floor(Math.random() * 4)
-              c = 5*Math.floor(Math.random() * 4)
-          }
-
           //check if the color is similar to the previous one
-          while(i!=0 && ('#' + a.toString(16) + b.toString(16) + c.toString(16))==colorstack[i-1]){
+          while((i!=0 && ('#' + a.toString(16) + b.toString(16) + c.toString(16))==colorstack[i-1])||(a==0 && b==0 && c==0)){
                    a = 5*Math.floor(Math.random() * 4)
                    b = 5*Math.floor(Math.random() * 4)
                    c = 5*Math.floor(Math.random() * 4)
@@ -134,15 +363,17 @@
 
         //setup the css styple for the div
         cursor_username.style.color ="black";
-        cursor_username.style.height = "13px";
-        cursor_username.style.width = "40px";
+        cursor_username.style.padding="2px 3px"
         cursor_username.style.backgroundColor = color;
         cursor_username.style.position="absolute";
         cursor_username.style.top="13px";
+        cursor_username.style.zIndex="6"
+        cursor_username.style.display="none";
 
         //add the div to the page
         var wrapper=document.getElementsByClassName(label)[0];
         wrapper.appendChild(cursor_username);
+
 
         //record the div in the cursor tag
         cursor_tag[user_id]=cursor_username;
@@ -169,13 +400,32 @@
         //setup the css styple for the div
         dynDiv.style.color =color;
         dynDiv.style.height = "20px";
-        dynDiv.style.width = "60px";
+        dynDiv.style.width = "200px";
         dynDiv.style.backgroundColor = 'black';
 
         //add the div to the page
         document.body.appendChild(dynDiv);
       }
 
+      //helper function for tag move when mouse moves
+      function tagMove(users,cursor_tag,message,num){
+
+          //add the username tag on cursor and make it fade after 3 secs
+          setTimeout(function() {
+              cursor_username(num,message.name,message.user_id,"user_"+num);
+              $("#"+num).fadeIn(100,screenChange("#"+num));
+          },50);
+
+           //check if the username tag is dropped when there is a repaint of the board if it is thenreadded it
+           setTimeout(function() {
+              tagCheck(users,cursor_tag);
+           },100);
+
+           //add the mouseover function
+           setTimeout(function(){
+              mouseOver();
+           },150);
+      }
 
       //connection function
       function connect() {
@@ -206,28 +456,8 @@
                     //check if the client text is the same with the user's text
                     if (string_message!=(editor.getValue())){
 
-                            //forbid the info send to server before the change is applied
-                            from_cursor=true;
-                            applychange=true;
-                            from_message=true;
-
-                                 //maybe useful for future: editor.setReadOnly(true)
-
-                            //set the text to be the client text
-                            editor.setValue(string_message);
-
-                            //after the text is resetted clear mouse selection
-                            editor.clearSelection();
-
-                            //get the mouse back to the start point
-                            editor.getSelection().moveCursorToScreen(0, 0,false);
-
-                                //maybe useful for future: setTimeout(function(){editor.setReadOnly(false)},800);
-
-                            //allow the info send to server to apply the new changes
-                            from_message=false;
-                            from_cursor=false;
-                            applychange=false;
+                        //set or reset the text
+                        setText(string_message,0,0);
 
                     }
                 }
@@ -240,31 +470,11 @@
                     //check if the client text is the same with the user's text
                     if (string_message!=(editor.getValue())){
 
-                            //forbid the info send to server before the change is applied
-                            from_cursor=true;
-                            applychange=true;
-                            from_message=true;
-
-                                //maybe useful for future: editor.setReadOnly(true);
-
                             //get the cursor's current position
                             var position=editor.getSelection().getCursor();
 
-                            //reset the text to be the client text
-                            editor.setValue(string_message);
-
-                            //after the text is resetted clear mouse selection
-                            editor.clearSelection();
-
-                            //get the mouse back to the original position
-                            editor.getSelection().moveCursorToScreen(position.row, position.column,false);
-
-                                //maybe useful for future: setTimeout(function(){editor.setReadOnly(false)},800);
-
-                            //allow the info send to server to apply the new changes
-                            from_message=false;
-                            from_cursor=false;
-                            applychange=false;
+                            //set or reset the text
+                            setText(string_message,position.row,position.column);
 
                     }
                 }
@@ -278,42 +488,17 @@
                 //create the cursor for the new user
                 else if (message.act == "create_cursor"){
 
-                    //build up the range object of the cursor
-                    var row= message.row;
-                    var messagelumn1= message.column;
-                    var column2=column1 +1;
-                    var myrange=new r(row,column1,row,column2);
-
                     //get the css style num for the user
                     var num=message.user_id % 200;
 
                     //add the cursor to the screen
-                    var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
-
-                    //add the username tag on cursor and make it fade after 3 secs
-                    setTimeout(function() {
-                        cursor_username(num,message.name,message.user_id,"user_"+num);
-                        $("#"+num).fadeOut(3000);
-                    },50);
-
-                   //check if the username tag is dropped when there is a repaint of the board if it is then
-                   //readded it
-                   setTimeout(function() {
-                      for(var i=0;i<users.length;i++){
-                            if(users[i]!=null&&users[i]!=-1&& $("#"+i).length==0){
-                                var num=i%200;
-                                document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
-                            }
-                       }
-                   },100);
-
-                    //record the cursor id in the users list by index to be user id
-                    users[message.user_id]=mark_id;
-
+                    createMarker(users,message,num);
 
                     //create a div for the user name to match with the cursor color
                     DynamicDiv(num,message.name,message.user_id);
 
+                    //add the username tag on cursor and make it fade after 3 secs
+                    tagMove(users,cursor_tag,message,num);
                 }
 
                 //remove the cursor for the disconnected user
@@ -329,11 +514,7 @@
                     editor.session.removeMarker(mark_id);
 
                     //remove the div of the user
-                    var oldelement=document.getElementById("name"+message.user_id);
-                    if (oldelement) {
-                        oldelement.parentNode.removeChild(oldelement);
-                    }
-
+                    divRemove("name"+message.user_id);
                 }
 
                 //move the user's cursor accordingly
@@ -343,10 +524,7 @@
                     var num=message.user_id % 200;
 
                     //remove the old username-cursor tag's div
-                    var oldelement=document.getElementById(message.user_id);
-                    if (oldelement) {
-                        oldelement.parentNode.removeChild(oldelement);
-                    }
+                    divRemove(message.user_id);
 
                     //forbid the info send to server before the cursor change is made
                     from_cursor=true;
@@ -357,42 +535,27 @@
                         //get the cursor id from the users list
                         var mark_id=users[message.user_id];
 
-                        //remove the cursor from the screen
-                        editor.session.removeMarker(mark_id);
-                    }
-                    else{
+                        //build up the range object of the new cursor position
+                        var my_range=createRange(message.row,message.column,message.row,message.column+1);
+
+                         //update the marker
+                        editor.session.getMarkers()[mark_id].range=my_range;
+                        if(editor.session.getMarkers()[mark_id].clazz!="user_"+num+" ace_cursor"){
+                            editor.session.getMarkers()[mark_id].clazz="user_"+num+" ace_cursor";
+                        }
+                        editor.updateSelectionMarkers();
+
+                    }else{
+
+                        //create a new user div to match the cursor color and username for the user
                         DynamicDiv(num,message.name,message.user_id);
+
+                        //add the cursor to the screen
+                        createMarker(users,message,num);
                     }
-
-
-                    //build up the range object of the new cursor position
-                    var row= message.row;
-                    var column1= message.column;
-                    var column2=column1 +1;
-                    var myrange=new r(row,column1,row,column2);
-
-                   //add the cursor to the screen
-                    var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_cursor","text");
-
-                   //record the cursor id in the users list by index to be user id
-                    users[message.user_id]=mark_id;
 
                    //add the username tag on cursor and make it fade after 3 secs
-                   setTimeout(function() {
-                       cursor_username(num,message.name,message.user_id,"user_"+num);
-                       $("#"+num).fadeOut(3000);
-                   },50);
-
-                   //check if the username tag is dropped when there is a repaint of the board if it is then
-                   //readded it
-                   setTimeout(function() {
-                      for(var i=0;i<users.length;i++){
-                            if(users[i]!=null&&users[i]!=-1&& $("#"+i).length==0){
-                                var num=i%200;
-                                document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
-                            }
-                       }
-                   },100);
+                   tagMove(users,cursor_tag,message,num);
 
                    //enable the cursor info send to server
                    from_cursor=false;
@@ -405,10 +568,7 @@
                     var num=message.user_id % 200;
 
                     //remove the old username-cursor tag's div
-                    var oldelement=document.getElementById(message.user_id);
-                    if (oldelement) {
-                        oldelement.parentNode.removeChild(oldelement);
-                    }
+                    divRemove(message.user_id);
 
                     //check if the user's cursor is in the list if it is remove the old one if not create a new
                     //user div to match the cursor color and username for the user
@@ -416,47 +576,37 @@
                         //get the cursor id from the users list
                         var mark_id=users[message.user_id];
 
-                        //remove the cursor from the screen
-                        editor.session.removeMarker(mark_id);
-                    }
-                    else{
-                        DynamicDiv(num,message.name,message.user_id);
-                    }
+                       //build up the range object of the new selection
+                       var my_range=createRange(message.start_row,message.start_column,message.end_row,message.end_column);
 
+                       //update the marker
+                       editor.session.getMarkers()[mark_id].range=my_range;
 
-                    //build up the range object of the new selection
-                    var row1= message.start_row;
-                    var row2= message.end_row;
-                    var column1= message.start_column;
-                    var column2=message.end_column;
-                    var myrange=new r(row1,column1,row2,column2);
-
-
-
-                   //add the selection to the screen
-                    var mark_id=editor.session.addMarker(myrange,"user_"+num+" ace_selection","text");
-
-                   //add the username tag on cursor and make it fade after 3 secs
-                   setTimeout(function() {
-                       cursor_username(num,message.name,message.user_id,"user_"+num);
-                       $("#"+num).fadeOut(3000);
-
-
-                   },50);
-
-                   //check if the username tag is dropped when there is a repaint of the board if it is then
-                   //readded it
-                   setTimeout(function() {
-                      for(var i=0;i<users.length;i++){
-                            if(users[i]!=null&&users[i]!=-1&& $("#"+i).length==0){
-                                var num=i%200;
-                                document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
-                            }
+                       if(editor.session.getMarkers()[mark_id].clazz!="user_"+num+" ace_selection"){
+                            editor.session.getMarkers()[mark_id].clazz="user_"+num+" ace_selection";
                        }
-                   },100);
 
-                   //record the selection id in the users list by index to be user id
-                    users[message.user_id]=mark_id;
+                       editor.updateSelectionMarkers();
+
+                    }else{
+
+                        //create a new user div to match the cursor color and username for the user
+                        DynamicDiv(num,message.name,message.user_id);
+
+                        //build up the range object of the new selection
+                        var my_range=createRange(message.start_row,message.start_column,message.end_row,message.end_column);
+
+                        //add the selection to the screen
+                        var mark_id=editor.session.addMarker(my_range,"user_"+num+" ace_selection","text");
+                        editor.session.addDynamicMarker(editor.session.getMarkers()[mark_id],false);
+
+                        //record the cursor id in the users list by index to be user id
+                        users[message.user_id]=mark_id;
+
+                    }
+
+                    //add the username tag on cursor and make it fade after 3 secs
+                    tagMove(users,cursor_tag,message,num);
                 }
 
                 //deal with the message change
@@ -489,6 +639,7 @@
 
                    //enable the message info send to server
                     from_message = false;
+
                 }
         };
 
@@ -514,30 +665,14 @@
         return false;
       });
 
-        //mouseover function to show the hidden username tag on the cursor, when mouseout the tag fade in 3 secs
-        setTimeout(function(){
-        $(".ace_start").on('mouseover',function() {
-                var child=$(this).children();
-                    child.fadeIn(100);
-                }
-         );
-
-        $(".ace_start").on('mouseout',function() {
-                var child=$(this).children();
-                    child.fadeOut(3000);
-                }
-         );
-        },500);
 
         //check if the username tag is dropped when there is a repaint of the board if it is then
         //readded it
        $( "#editor" ).click(function() {
-            for(var i=0;i<users.length;i++){
-                if(users[i]!=null&&users[i]!=-1&& $("#"+i).length==0){
-                    var num=i%200;
-                    document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
-                }
-            }
+            tagCheck(users,cursor_tag);
+            setTimeout(function(){
+                mouseOver();
+            },50);
        });
 
         //send the info to the server when there is a new text change detected
@@ -564,13 +699,12 @@
 
 
                 setTimeout(function() {
-                    for(var i=0;i<users.length;i++){
-                        if (users[i]!=-1 && users[i]!=null){
-                            var num=i%200;
-                            document.getElementsByClassName("user_"+num)[0].appendChild(cursor_tag[i]);
-                        }
-                    }
+                    tagCheck(users,cursor_tag);
                 },300)
+
+                setTimeout(function(){
+                    mouseOver();
+                },450);
             };
         });
 
